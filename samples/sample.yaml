@@ -6,17 +6,20 @@ tasks:
     earliest_start: 60 # earliest start time
     latest_end: 180 # latest end time
     eligible_resources: [me] # allowed resources
+    priority: 2 # priority rank (higher = more important)
   report_write: # task id
     duration: 120 # task duration in slots
     earliest_start: 180 # earliest start time
     latest_end: 600 # latest end time
     eligible_resources: [me] # allowed resources
+    priority: 1 # priority rank (higher = more important)
   deploy_job: # task id
     duration: 20 # task duration in slots
     earliest_start: 300 # earliest start time
     latest_end: 900 # latest end time
     eligible_resources: [runner-1, runner-2] # allowed resources
     resource_demand: 1 # capacity units required
+    priority: 3 # priority rank (higher = more important)
 
 resources:
   me: # resource id

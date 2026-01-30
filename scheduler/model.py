@@ -14,6 +14,7 @@ class Task:
     latest_end: int | None = None
     eligible_resources: Sequence[str] | None = None
     resource_demand: int = 1
+    priority: int = 0
     metadata: dict[str, object] = field(default_factory=dict)
 
 

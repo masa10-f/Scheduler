@@ -32,6 +32,7 @@ def problem_from_dict(data: Mapping[str, Any]) -> Problem:
             latest_end=task.get("latest_end"),
             eligible_resources=task.get("eligible_resources"),
             resource_demand=task.get("resource_demand", 1),
+            priority=task.get("priority", 0),
             metadata=task.get("metadata", {}),
         )
 
