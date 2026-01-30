@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from .model import Problem, Schedule, TimeWindow
+from scheduler.model import Problem, Schedule, TimeWindow
 
 
 @dataclass(frozen=True)
@@ -194,6 +194,16 @@ class ResourceCapacityConstraint(Constraint):
                         )
                     )
         return results
+
+
+def default_constraints() -> list[Constraint]:
+    return [
+        TimeWindowConstraint(),
+        PrecedenceConstraint(),
+        ResourceEligibilityConstraint(),
+        ResourceAvailabilityConstraint(),
+        ResourceCapacityConstraint(),
+    ]
 
 
 def _interval_within_windows(

@@ -4,7 +4,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .model import Assignment, Precedence, Problem, Resource, Schedule, Task, TimeWindow
+from scheduler.model import Assignment, Precedence, Problem, Resource, Schedule, Task, TimeWindow
 
 
 def load_problem_yaml(path: str | Path) -> Problem:
