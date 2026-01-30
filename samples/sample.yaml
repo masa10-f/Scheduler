@@ -1,0 +1,46 @@
+time_horizon: 1440 # total scheduling horizon (slots)
+
+tasks:
+  morning_email: # task id
+    duration: 30 # task duration in slots
+    earliest_start: 60 # earliest start time
+    latest_end: 180 # latest end time
+    eligible_resources: [me] # allowed resources
+  report_write: # task id
+    duration: 120 # task duration in slots
+    earliest_start: 180 # earliest start time
+    latest_end: 600 # latest end time
+    eligible_resources: [me] # allowed resources
+  deploy_job: # task id
+    duration: 20 # task duration in slots
+    earliest_start: 300 # earliest start time
+    latest_end: 900 # latest end time
+    eligible_resources: [runner-1, runner-2] # allowed resources
+    resource_demand: 1 # capacity units required
+
+resources:
+  me: # resource id
+    capacity: 1 # max concurrent demand
+    availability: [[0, 720]] # available windows [start, end)
+  runner-1: # resource id
+    capacity: 1 # max concurrent demand
+    availability: [[0, 1440]] # available windows [start, end)
+  runner-2: # resource id
+    capacity: 1 # max concurrent demand
+    availability: [[0, 1440]] # available windows [start, end)
+
+precedences:
+  - before: morning_email # predecessor task id
+    after: report_write # successor task id
+    lag: 15 # minimum gap after predecessor ends
+
+assignments:
+  - task_id: morning_email # task id
+    resource_id: me # resource id
+    start: 90 # assigned start time
+  - task_id: report_write # task id
+    resource_id: me # resource id
+    start: 210 # assigned start time
+  - task_id: deploy_job # task id
+    resource_id: runner-1 # resource id
+    start: 360 # assigned start time
