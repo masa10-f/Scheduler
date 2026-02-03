@@ -3,7 +3,7 @@ from __future__ import annotations
 import heapq
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from scheduler.constraints import (
     Constraint,
@@ -12,6 +12,9 @@ from scheduler.constraints import (
     evaluate_constraints,
 )
 from scheduler.model import Assignment, Precedence, Problem, Schedule, Task
+
+if TYPE_CHECKING:
+    from scheduler.costs import Objective
 
 
 @dataclass
@@ -25,7 +28,9 @@ class SolverResult:
 
 
 def solve_greedy(
-    problem: Problem, constraints: Iterable[Constraint] | None = None
+    problem: Problem,
+    constraints: Iterable[Constraint] | None = None,
+    objective: "Objective | None" = None,
 ) -> SolverResult:
     constraints = list(constraints) if constraints is not None else default_constraints()
     horizon = _compute_time_horizon(problem)
@@ -50,10 +55,12 @@ def solve_greedy(
 
         candidate = _find_best_slot(
             problem,
+            schedule,
             task,
             min_start,
             latest_start,
             usage_by_resource,
+            objective,
         )
         if candidate is None:
             unscheduled.append(task_id)
@@ -70,12 +77,17 @@ def solve_greedy(
         status = "partial"
     if violations and status == "ok":
         status = "violations"
+    objective_value = (
+        objective.schedule_cost(problem=problem, schedule=schedule)
+        if objective is not None
+        else _makespan(problem, schedule)
+    )
     return SolverResult(
         schedule=schedule,
         status=status,
         violations=violations,
         unscheduled=unscheduled,
-        objective=_makespan(problem, schedule),
+        objective=objective_value,
         metadata={"solver": "greedy"},
     )
 
@@ -84,6 +96,7 @@ def solve_cp_sat(
     problem: Problem,
     constraints: Iterable[Constraint] | None = None,
     time_limit_s: float | None = 5.0,
+    objective: "Objective | None" = None,
 ) -> SolverResult:
     try:
         from ortools.sat.python import cp_model  # type: ignore
@@ -186,7 +199,20 @@ def solve_cp_sat(
 
     makespan = model.NewIntVar(0, horizon, "makespan")
     model.AddMaxEquality(makespan, [end_vars[tid] for tid in tasks])
-    model.Minimize(makespan)
+    if objective is None:
+        model.Minimize(makespan)
+    else:
+        model.Minimize(
+            objective.cp_sat_expr(
+                model=model,
+                problem=problem,
+                start_vars=start_vars,
+                end_vars=end_vars,
+                presence=presence,
+                horizon=horizon,
+                makespan=makespan,
+            )
+        )
 
     solver = cp_model.CpSolver()
     if time_limit_s is not None:
@@ -218,12 +244,17 @@ def solve_cp_sat(
         )
 
     violations = evaluate_constraints(problem, schedule, constraints)
+    objective_value = (
+        objective.schedule_cost(problem=problem, schedule=schedule)
+        if objective is not None
+        else int(solver.Value(makespan))
+    )
     return SolverResult(
         schedule=schedule,
         status="ok" if not violations else "violations",
         violations=violations,
         unscheduled=[],
-        objective=int(solver.Value(makespan)),
+        objective=objective_value,
         metadata={"solver": "cp-sat", "cp_status": solver.StatusName(status)},
     )
 
@@ -232,11 +263,17 @@ def compare_solvers(
     problem: Problem,
     constraints: Iterable[Constraint] | None = None,
     time_limit_s: float | None = 5.0,
+    objective: "Objective | None" = None,
 ) -> dict[str, SolverResult]:
     return {
-        "greedy": solve_greedy(problem, constraints=constraints),
+        "greedy": solve_greedy(
+            problem, constraints=constraints, objective=objective
+        ),
         "cp-sat": solve_cp_sat(
-            problem, constraints=constraints, time_limit_s=time_limit_s
+            problem,
+            constraints=constraints,
+            time_limit_s=time_limit_s,
+            objective=objective,
         ),
     }
 
@@ -302,17 +339,19 @@ def _latest_start(task: Task, horizon: int) -> int | None:
 
 def _find_best_slot(
     problem: Problem,
+    schedule: Schedule,
     task: Task,
     min_start: int,
     latest_start: int,
     usage_by_resource: dict[str, dict[int, int]],
+    objective: "Objective | None",
 ) -> tuple[str, int] | None:
     if task.eligible_resources is None:
         resources = list(problem.resources.keys())
     else:
         resources = [rid for rid in task.eligible_resources if rid in problem.resources]
 
-    best: tuple[int, int, str] | None = None
+    best: tuple[float, int, int, str] | None = None
     for resource_id in resources:
         candidate = _earliest_feasible_start(
             problem,
@@ -325,12 +364,22 @@ def _find_best_slot(
         if candidate is None:
             continue
         end = candidate + task.duration
-        key = (end, candidate, resource_id)
+        if objective is None:
+            score = float(end)
+        else:
+            score = objective.greedy_score(
+                problem=problem,
+                schedule=schedule,
+                task_id=task.id,
+                resource_id=resource_id,
+                start=candidate,
+            )
+        key = (score, end, candidate, resource_id)
         if best is None or key < best:
             best = key
     if best is None:
         return None
-    _, start, resource_id = best
+    _, _, start, resource_id = best
     return resource_id, start
 
 
