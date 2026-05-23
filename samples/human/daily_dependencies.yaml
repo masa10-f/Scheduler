@@ -1,0 +1,71 @@
+date: "2026-05-20"
+metadata:
+  name: daily_dependencies
+
+time_slots:
+  - index: 0
+    start: "09:00"
+    end: "10:30"
+    work_kind: focused_work
+  - index: 1
+    start: "11:00"
+    end: "12:00"
+    work_kind: light_work
+  - index: 2
+    start: "13:00"
+    end: "15:00"
+    work_kind: focused_work
+  - index: 3
+    start: "15:30"
+    end: "17:00"
+    work_kind: study
+
+task_dependencies:
+  implementation_plan:
+    - requirements_review
+  stakeholder_summary:
+    - implementation_plan
+  blocked_followup:
+    - missing_input
+
+tasks:
+  - id: requirements_review
+    title: Review requirements
+    remaining_minutes: 60
+    priority: 1
+    work_kind: focused_work
+    due_at: "2026-05-20T12:00:00"
+    project_id: scheduler
+    goal_id: planning
+  - id: implementation_plan
+    title: Write implementation plan
+    remaining_minutes: 90
+    priority: 1
+    work_kind: focused_work
+    due_at: "2026-05-20T17:00:00"
+    project_id: scheduler
+    goal_id: planning
+  - id: stakeholder_summary
+    title: Summarize plan for stakeholders
+    remaining_minutes: 45
+    priority: 2
+    work_kind: light_work
+    due_at: "2026-05-21T12:00:00"
+    project_id: scheduler
+    goal_id: communication
+  - id: blocked_followup
+    title: Follow up on blocked dependency
+    remaining_minutes: 30
+    priority: 2
+    work_kind: light_work
+    due_at: "2026-05-20T17:00:00"
+    project_id: scheduler
+    goal_id: communication
+  - id: background_reading
+    title: Read background material
+    remaining_minutes: 75
+    priority: 4
+    work_kind: study
+    due_at: "2026-05-27T17:00:00"
+    project_id: scheduler
+    goal_id: learning

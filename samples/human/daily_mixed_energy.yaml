@@ -1,0 +1,65 @@
+date: "2026-05-20"
+metadata:
+  name: daily_mixed_energy
+
+time_slots:
+  - index: 0
+    start: "08:30"
+    end: "10:30"
+    work_kind: focused_work
+  - index: 1
+    start: "11:00"
+    end: "12:00"
+    work_kind: light_work
+  - index: 2
+    start: "13:30"
+    end: "15:00"
+    work_kind: study
+  - index: 3
+    start: "15:30"
+    end: "17:00"
+    work_kind: light_work
+
+fixed_assignments:
+  - task_id: standup_notes
+    slot_index: 1
+    duration_minutes: 30
+
+tasks:
+  - id: architecture_sketch
+    title: Sketch scheduler architecture
+    remaining_minutes: 100
+    priority: 1
+    work_kind: focused_work
+    due_at: "2026-05-23T17:00:00"
+    project_id: scheduler
+    goal_id: phase-two
+  - id: api_contract_reading
+    title: Read API contract notes
+    remaining_minutes: 75
+    priority: 2
+    work_kind: study
+    due_at: "2026-05-24T17:00:00"
+    project_id: scheduler
+    goal_id: phase-two
+  - id: standup_notes
+    title: Prepare standup notes
+    remaining_minutes: 30
+    priority: 2
+    work_kind: light_work
+    due_at: "2026-05-20T11:30:00"
+    project_id: scheduler
+    goal_id: communication
+  - id: slack_followups
+    title: Answer Slack follow-ups
+    remaining_minutes: 25
+    priority: 4
+    work_kind: light_work
+    source: quick_task
+  - id: issue_triage
+    title: Triage incoming issues
+    remaining_minutes: 45
+    priority: 3
+    work_kind: light_work
+    project_id: support
+    goal_id: queue

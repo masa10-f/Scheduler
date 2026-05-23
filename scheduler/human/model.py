@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Literal, TypeAlias
 
@@ -123,3 +123,86 @@ class HumanDailyPlan:
     unscheduled_task_ids: list[str] = field(default_factory=list)
     status: str = "UNKNOWN"
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class HumanDailySolverConfig:
+    """Tunable scores for the Phase 1 Human daily comparison solvers."""
+
+    kind_match_score: int = 8
+    kind_mismatch_score: int = 1
+    priority_score_base: int = 6
+    deadline_soon_days: int = 2
+    deadline_score: int = 4
+    overdue_score: int = 20
+    fixed_assignment_score: int = 100
+
+    def __post_init__(self) -> None:
+        if self.kind_match_score < 0:
+            raise ValueError("kind_match_score must be non-negative")
+        if self.kind_mismatch_score < 0:
+            raise ValueError("kind_mismatch_score must be non-negative")
+        if self.priority_score_base < 1:
+            raise ValueError("priority_score_base must be positive")
+        if self.deadline_soon_days < 0:
+            raise ValueError("deadline_soon_days must be non-negative")
+        if self.deadline_score < 0:
+            raise ValueError("deadline_score must be non-negative")
+        if self.overdue_score < 0:
+            raise ValueError("overdue_score must be non-negative")
+        if self.fixed_assignment_score < 0:
+            raise ValueError("fixed_assignment_score must be non-negative")
+
+
+@dataclass(frozen=True)
+class HumanDailyFixture:
+    """Editable fixture input for Human daily scheduling review."""
+
+    date: date
+    tasks: list[HumanTask]
+    time_slots: list[HumanTimeSlot]
+    fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
+    task_dependencies: dict[str, list[str]] = field(default_factory=dict)
+    solver_config: HumanDailySolverConfig = field(
+        default_factory=HumanDailySolverConfig
+    )
+    metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class HumanUnscheduledTask:
+    task_id: str
+    title: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class HumanConstraintViolation:
+    code: str
+    message: str
+    task_id: str | None = None
+    slot_index: int | None = None
+
+
+@dataclass(frozen=True)
+class HumanScoreBreakdown:
+    task_id: str
+    slot_index: int
+    total: int
+    components: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class HumanSolverReport:
+    solver_name: str
+    plan: HumanDailyPlan
+    unscheduled_tasks: list[HumanUnscheduledTask] = field(default_factory=list)
+    score_breakdown: list[HumanScoreBreakdown] = field(default_factory=list)
+    violations: list[HumanConstraintViolation] = field(default_factory=list)
+    config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
+
+
+@dataclass(frozen=True)
+class HumanSolverComparison:
+    fixture: HumanDailyFixture
+    reports: dict[str, HumanSolverReport]

@@ -1,0 +1,59 @@
+date: "2026-05-20"
+metadata:
+  name: daily_deadline_pressure
+
+time_slots:
+  - index: 0
+    start: "09:00"
+    end: "11:30"
+    work_kind: focused_work
+  - index: 1
+    start: "13:00"
+    end: "15:00"
+    work_kind: light_work
+  - index: 2
+    start: "15:30"
+    end: "17:30"
+    work_kind: focused_work
+
+tasks:
+  - id: overdue_invoice_fix
+    title: Fix overdue invoice workflow
+    remaining_minutes: 90
+    priority: 2
+    work_kind: focused_work
+    due_at: "2026-05-19T18:00:00"
+    project_id: billing
+    goal_id: billing-release
+  - id: today_launch_checklist
+    title: Finish launch checklist
+    remaining_minutes: 60
+    priority: 1
+    work_kind: light_work
+    due_at: "2026-05-20T16:00:00"
+    project_id: launch
+    goal_id: launch-ready
+  - id: tomorrow_security_review
+    title: Security review notes
+    remaining_minutes: 75
+    priority: 3
+    work_kind: focused_work
+    due_at: "2026-05-21T12:00:00"
+    project_id: platform
+    goal_id: security
+  - id: later_docs
+    title: Polish docs for next week
+    remaining_minutes: 80
+    priority: 4
+    work_kind: light_work
+    due_at: "2026-05-27T17:00:00"
+    project_id: docs
+    goal_id: docs-polish
+  - id: oversized_migration
+    title: Migration dry run
+    remaining_minutes: 210
+    priority: 2
+    work_kind: focused_work
+    due_at: "2026-05-21T17:00:00"
+    project_id: platform
+    goal_id: migration
