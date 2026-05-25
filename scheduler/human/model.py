@@ -127,7 +127,7 @@ class HumanDailyPlan:
 
 @dataclass(frozen=True)
 class HumanDailySolverConfig:
-    """Tunable scores for the Phase 1 Human daily comparison solvers."""
+    """Tunable scores for the Human daily comparison solvers."""
 
     kind_match_score: int = 8
     kind_mismatch_score: int = 1
@@ -136,6 +136,14 @@ class HumanDailySolverConfig:
     deadline_score: int = 4
     overdue_score: int = 20
     fixed_assignment_score: int = 100
+    dependency_unlock_score: int = 3
+    project_switch_penalty: int = 4
+    project_switch_reset_gap_minutes: int = 30
+    long_continuous_threshold_minutes: int = 120
+    long_continuous_penalty: int = 5
+    break_reset_gap_minutes: int = 20
+    small_gap_minutes: int = 15
+    small_gap_fill_score: int = 2
 
     def __post_init__(self) -> None:
         if self.kind_match_score < 0:
@@ -152,6 +160,26 @@ class HumanDailySolverConfig:
             raise ValueError("overdue_score must be non-negative")
         if self.fixed_assignment_score < 0:
             raise ValueError("fixed_assignment_score must be non-negative")
+        if self.dependency_unlock_score < 0:
+            raise ValueError("dependency_unlock_score must be non-negative")
+        if self.project_switch_penalty < 0:
+            raise ValueError("project_switch_penalty must be non-negative")
+        if self.project_switch_reset_gap_minutes < 0:
+            raise ValueError(
+                "project_switch_reset_gap_minutes must be non-negative"
+            )
+        if self.long_continuous_threshold_minutes < 0:
+            raise ValueError(
+                "long_continuous_threshold_minutes must be non-negative"
+            )
+        if self.long_continuous_penalty < 0:
+            raise ValueError("long_continuous_penalty must be non-negative")
+        if self.break_reset_gap_minutes < 0:
+            raise ValueError("break_reset_gap_minutes must be non-negative")
+        if self.small_gap_minutes < 0:
+            raise ValueError("small_gap_minutes must be non-negative")
+        if self.small_gap_fill_score < 0:
+            raise ValueError("small_gap_fill_score must be non-negative")
 
 
 @dataclass(frozen=True)

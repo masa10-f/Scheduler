@@ -138,6 +138,18 @@ def _parse_solver_config(raw: Any) -> HumanDailySolverConfig:
         deadline_score=int(raw.get("deadline_score", 4)),
         overdue_score=int(raw.get("overdue_score", 20)),
         fixed_assignment_score=int(raw.get("fixed_assignment_score", 100)),
+        dependency_unlock_score=int(raw.get("dependency_unlock_score", 3)),
+        project_switch_penalty=int(raw.get("project_switch_penalty", 4)),
+        project_switch_reset_gap_minutes=int(
+            raw.get("project_switch_reset_gap_minutes", 30)
+        ),
+        long_continuous_threshold_minutes=int(
+            raw.get("long_continuous_threshold_minutes", 120)
+        ),
+        long_continuous_penalty=int(raw.get("long_continuous_penalty", 5)),
+        break_reset_gap_minutes=int(raw.get("break_reset_gap_minutes", 20)),
+        small_gap_minutes=int(raw.get("small_gap_minutes", 15)),
+        small_gap_fill_score=int(raw.get("small_gap_fill_score", 2)),
     )
 
 
