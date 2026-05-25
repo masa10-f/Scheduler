@@ -173,7 +173,11 @@ def _place_fixed_assignment(
         )
         return
 
-    duration = fixed.duration_minutes or task.remaining_minutes
+    duration = (
+        fixed.duration_minutes
+        if fixed.duration_minutes is not None
+        else task.remaining_minutes
+    )
     remaining_capacity = slot.effective_capacity_minutes - slot_usage[slot.index]
     if duration <= 0:
         unscheduled[task.id] = "task_has_no_remaining_minutes"
@@ -221,12 +225,15 @@ def _fill_timeline_slots(
     for slot_position, slot in enumerate(sorted_slots):
         future_slots = sorted_slots[slot_position + 1 :]
         while True:
+            candidate_start = slot_cursors[slot.index]
             candidates = [
                 task
                 for task in fixture.tasks
                 if task.id not in scheduled
                 and task.id not in unscheduled
-                and _dependencies_are_scheduled(task.id, fixture, scheduled)
+                and _dependencies_finish_by(
+                    task.id, fixture, scheduled, candidate_start
+                )
                 and _can_use_slot(task, slot)
                 and task.remaining_minutes <= slot.effective_capacity_minutes - slot_usage[slot.index]
                 and not _should_defer_for_future_kind_match(
@@ -296,7 +303,7 @@ def _fill_legacy_slots(
         candidate_slots = [
             slot
             for slot in sorted_slots
-            if _dependencies_allow_legacy_slot(task.id, slot.index, fixture, scheduled)
+            if _dependencies_allow_legacy_slot(task.id, slot, fixture, scheduled)
             and _can_use_slot(task, slot)
             and task.remaining_minutes <= slot.effective_capacity_minutes - slot_usage[slot.index]
         ]
@@ -324,21 +331,28 @@ def _fill_legacy_slots(
         )
 
 
-def _dependencies_are_scheduled(
-    task_id: str, fixture: HumanDailyFixture, scheduled: dict[str, HumanScheduleBlock]
+def _dependencies_finish_by(
+    task_id: str,
+    fixture: HumanDailyFixture,
+    scheduled: dict[str, HumanScheduleBlock],
+    start_minutes: int,
 ) -> bool:
-    return all(prereq in scheduled for prereq in fixture.task_dependencies.get(task_id, []))
+    for prereq in fixture.task_dependencies.get(task_id, []):
+        block = scheduled.get(prereq)
+        if block is None or _minutes(block.end) > start_minutes:
+            return False
+    return True
 
 
 def _dependencies_allow_legacy_slot(
     task_id: str,
-    slot_index: int,
+    slot: HumanTimeSlot,
     fixture: HumanDailyFixture,
     scheduled: dict[str, HumanScheduleBlock],
 ) -> bool:
     for prereq in fixture.task_dependencies.get(task_id, []):
         block = scheduled.get(prereq)
-        if block is None or block.slot_index >= slot_index:
+        if block is None or _minutes(block.end) > _minutes(slot.start):
             return False
     return True
 

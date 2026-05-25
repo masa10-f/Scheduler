@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from datetime import date, time
 from pathlib import Path
 import unittest
 
 from scheduler.human import (
+    HumanDailyFixture,
+    HumanFixedAssignment,
+    HumanTask,
+    HumanTimeSlot,
+    HumanWorkKind,
     compare_human_daily_solvers,
     format_human_daily_comparison,
     load_human_daily_fixture,
+    solve_human_daily_legacy,
+    solve_human_daily_timeline,
 )
 
 
@@ -62,6 +70,138 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertEqual(
             unscheduled["blocked_experiment_followup"], "dependency_not_scheduled"
         )
+
+    def test_timeline_solver_waits_for_prerequisite_finish_time(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(15, 0),
+                    end=time(15, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="prerequisite", slot_index=1)
+            ],
+            task_dependencies={"dependent": ["prerequisite"]},
+            tasks=[
+                HumanTask(
+                    id="prerequisite",
+                    title="Prerequisite",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        scheduled_ids = {block.task_id for block in report.plan.blocks}
+        self.assertNotIn("dependent", scheduled_ids)
+        self.assertEqual(report.violations, [])
+
+    def test_legacy_dependency_checks_use_slot_start_time(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=10,
+                    start=time(9, 0),
+                    end=time(9, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=0,
+                    start=time(13, 0),
+                    end=time(13, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="prerequisite", slot_index=10)
+            ],
+            task_dependencies={"dependent": ["prerequisite"]},
+            tasks=[
+                HumanTask(
+                    id="prerequisite",
+                    title="Prerequisite",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_legacy(fixture)
+
+        blocks = {block.task_id: block for block in report.plan.blocks}
+        self.assertEqual(blocks["dependent"].start, time(13, 0))
+        self.assertEqual(report.violations, [])
+
+    def test_fixed_assignment_zero_duration_does_not_consume_capacity(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(9, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(
+                    task_id="zero_duration_fixed",
+                    slot_index=0,
+                    duration_minutes=0,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="zero_duration_fixed",
+                    title="Zero duration fixed task",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="normal_task",
+                    title="Normal task",
+                    remaining_minutes=30,
+                    priority=2,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        scheduled_ids = {block.task_id for block in report.plan.blocks}
+        self.assertNotIn("zero_duration_fixed", scheduled_ids)
+        self.assertIn("normal_task", scheduled_ids)
 
     def test_comparison_report_includes_review_fields(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
