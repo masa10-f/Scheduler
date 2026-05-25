@@ -21,45 +21,45 @@ time_slots:
     work_kind: light_work
 
 fixed_assignments:
-  - task_id: standup_notes
+  - task_id: team_sync_notes
     slot_index: 1
     duration_minutes: 30
 
 tasks:
-  - id: architecture_sketch
-    title: Sketch scheduler architecture
+  - id: heuristic_design
+    title: Design scheduler heuristic
     remaining_minutes: 100
     priority: 1
     work_kind: focused_work
     due_at: "2026-05-23T17:00:00"
-    project_id: scheduler
+    project_id: software-dev
     goal_id: phase-two
-  - id: api_contract_reading
-    title: Read API contract notes
+  - id: paper_reading
+    title: Read theory paper notes
     remaining_minutes: 75
     priority: 2
     work_kind: study
     due_at: "2026-05-24T17:00:00"
-    project_id: scheduler
-    goal_id: phase-two
-  - id: standup_notes
-    title: Prepare standup notes
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: team_sync_notes
+    title: Prepare team sync notes
     remaining_minutes: 30
     priority: 2
     work_kind: light_work
     due_at: "2026-05-20T11:30:00"
-    project_id: scheduler
+    project_id: team-management
     goal_id: communication
-  - id: slack_followups
-    title: Answer Slack follow-ups
+  - id: review_followups
+    title: Answer PR and team follow-ups
     remaining_minutes: 25
     priority: 4
     work_kind: light_work
     source: quick_task
-  - id: issue_triage
-    title: Triage incoming issues
+  - id: experiment_queue_triage
+    title: Triage experiment and sprint issues
     remaining_minutes: 45
     priority: 3
     work_kind: light_work
-    project_id: support
+    project_id: team-management
     goal_id: queue

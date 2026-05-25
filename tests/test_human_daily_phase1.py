@@ -57,9 +57,11 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         unscheduled = {item.task_id: item.reason for item in report.unscheduled_tasks}
         scheduled_ids = {block.task_id for block in report.plan.blocks}
 
-        self.assertIn("requirements_review", scheduled_ids)
-        self.assertIn("implementation_plan", scheduled_ids)
-        self.assertEqual(unscheduled["blocked_followup"], "dependency_not_scheduled")
+        self.assertIn("paper_review", scheduled_ids)
+        self.assertIn("proof_outline", scheduled_ids)
+        self.assertEqual(
+            unscheduled["blocked_experiment_followup"], "dependency_not_scheduled"
+        )
 
     def test_comparison_report_includes_review_fields(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")

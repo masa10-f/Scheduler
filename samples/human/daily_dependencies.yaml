@@ -21,51 +21,51 @@ time_slots:
     work_kind: study
 
 task_dependencies:
-  implementation_plan:
-    - requirements_review
-  stakeholder_summary:
-    - implementation_plan
-  blocked_followup:
-    - missing_input
+  proof_outline:
+    - paper_review
+  team_update_summary:
+    - proof_outline
+  blocked_experiment_followup:
+    - missing_beam_profile
 
 tasks:
-  - id: requirements_review
-    title: Review requirements
+  - id: paper_review
+    title: Review related theorem notes
     remaining_minutes: 60
     priority: 1
     work_kind: focused_work
     due_at: "2026-05-20T12:00:00"
-    project_id: scheduler
-    goal_id: planning
-  - id: implementation_plan
-    title: Write implementation plan
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: proof_outline
+    title: Write proof outline
     remaining_minutes: 90
     priority: 1
     work_kind: focused_work
     due_at: "2026-05-20T17:00:00"
-    project_id: scheduler
-    goal_id: planning
-  - id: stakeholder_summary
-    title: Summarize plan for stakeholders
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: team_update_summary
+    title: Summarize research plan for team sync
     remaining_minutes: 45
     priority: 2
     work_kind: light_work
     due_at: "2026-05-21T12:00:00"
-    project_id: scheduler
+    project_id: team-management
     goal_id: communication
-  - id: blocked_followup
-    title: Follow up on blocked dependency
+  - id: blocked_experiment_followup
+    title: Follow up on blocked optics run
     remaining_minutes: 30
     priority: 2
     work_kind: light_work
     due_at: "2026-05-20T17:00:00"
-    project_id: scheduler
-    goal_id: communication
-  - id: background_reading
-    title: Read background material
+    project_id: optics-lab
+    goal_id: alignment-run
+  - id: optics_background_reading
+    title: Read optics calibration notes
     remaining_minutes: 75
     priority: 4
     work_kind: study
     due_at: "2026-05-27T17:00:00"
-    project_id: scheduler
-    goal_id: learning
+    project_id: optics-lab
+    goal_id: calibration

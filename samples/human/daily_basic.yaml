@@ -28,33 +28,33 @@ time_slots:
     work_kind: light_work
 
 tasks:
-  - id: proposal_draft
-    title: Draft product proposal
+  - id: scheduler_scoring_patch
+    title: Implement scheduler scoring patch
     remaining_minutes: 90
     priority: 1
     work_kind: focused_work
     due_at: "2026-05-22T17:00:00"
-    project_id: project-alpha
-    goal_id: goal-launch
-  - id: read_research
-    title: Read research notes
+    project_id: software-dev
+    goal_id: scheduler-quality
+  - id: theorem_notes
+    title: Read theorem proof notes
     remaining_minutes: 60
     priority: 3
     work_kind: study
     due_at: "2026-05-27T17:00:00"
-    project_id: project-alpha
-    goal_id: goal-launch
-  - id: inbox_cleanup
-    title: Clear inbox and small replies
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: team_followups
+    title: Clear team follow-ups and small replies
     remaining_minutes: 30
     priority: 4
     work_kind: light_work
     source: quick_task
-  - id: roadmap_review
-    title: Review roadmap comments
+  - id: optics_run_plan
+    title: Review optical experiment run plan
     remaining_minutes: 45
     priority: 2
     work_kind: focused_work
     due_at: "2026-05-21T12:00:00"
-    project_id: project-beta
-    goal_id: goal-roadmap
+    project_id: optics-lab
+    goal_id: alignment-run

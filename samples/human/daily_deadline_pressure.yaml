@@ -17,43 +17,43 @@ time_slots:
     work_kind: focused_work
 
 tasks:
-  - id: overdue_invoice_fix
-    title: Fix overdue invoice workflow
+  - id: overdue_regression_fix
+    title: Fix overdue scheduler regression
     remaining_minutes: 90
     priority: 2
     work_kind: focused_work
     due_at: "2026-05-19T18:00:00"
-    project_id: billing
-    goal_id: billing-release
-  - id: today_launch_checklist
-    title: Finish launch checklist
+    project_id: software-dev
+    goal_id: scheduler-quality
+  - id: today_lab_checklist
+    title: Finish optical experiment checklist
     remaining_minutes: 60
     priority: 1
     work_kind: light_work
     due_at: "2026-05-20T16:00:00"
-    project_id: launch
-    goal_id: launch-ready
-  - id: tomorrow_security_review
-    title: Security review notes
+    project_id: optics-lab
+    goal_id: alignment-run
+  - id: tomorrow_proof_review
+    title: Review proof notes for tomorrow meeting
     remaining_minutes: 75
     priority: 3
     work_kind: focused_work
     due_at: "2026-05-21T12:00:00"
-    project_id: platform
-    goal_id: security
-  - id: later_docs
-    title: Polish docs for next week
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: later_team_notes
+    title: Polish team planning notes for next week
     remaining_minutes: 80
     priority: 4
     work_kind: light_work
     due_at: "2026-05-27T17:00:00"
-    project_id: docs
-    goal_id: docs-polish
-  - id: oversized_migration
-    title: Migration dry run
+    project_id: team-management
+    goal_id: sprint-planning
+  - id: oversized_optics_alignment
+    title: Full optical alignment dry run
     remaining_minutes: 210
     priority: 2
     work_kind: focused_work
     due_at: "2026-05-21T17:00:00"
-    project_id: platform
-    goal_id: migration
+    project_id: optics-lab
+    goal_id: alignment-run
