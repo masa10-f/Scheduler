@@ -1,0 +1,60 @@
+date: "2026-05-20"
+metadata:
+  name: daily_basic
+
+solver_config:
+  kind_match_score: 8
+  kind_mismatch_score: 1
+  priority_score_base: 6
+  deadline_soon_days: 2
+  deadline_score: 4
+  overdue_score: 20
+  fixed_assignment_score: 100
+
+time_slots:
+  - index: 0
+    start: "09:00"
+    end: "12:00"
+    work_kind: focused_work
+    capacity_minutes: 150
+  - index: 1
+    start: "13:00"
+    end: "16:00"
+    work_kind: study
+    capacity_minutes: 150
+  - index: 2
+    start: "16:30"
+    end: "18:00"
+    work_kind: light_work
+
+tasks:
+  - id: scheduler_scoring_patch
+    title: Implement scheduler scoring patch
+    remaining_minutes: 90
+    priority: 1
+    work_kind: focused_work
+    due_at: "2026-05-22T17:00:00"
+    project_id: software-dev
+    goal_id: scheduler-quality
+  - id: theorem_notes
+    title: Read theorem proof notes
+    remaining_minutes: 60
+    priority: 3
+    work_kind: study
+    due_at: "2026-05-27T17:00:00"
+    project_id: theory-research
+    goal_id: paper-draft
+  - id: team_followups
+    title: Clear team follow-ups and small replies
+    remaining_minutes: 30
+    priority: 4
+    work_kind: light_work
+    source: quick_task
+  - id: optics_run_plan
+    title: Review optical experiment run plan
+    remaining_minutes: 45
+    priority: 2
+    work_kind: focused_work
+    due_at: "2026-05-21T12:00:00"
+    project_id: optics-lab
+    goal_id: alignment-run
