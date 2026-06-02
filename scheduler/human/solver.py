@@ -208,7 +208,9 @@ def _place_fixed_assignment(
     if sequential_starts:
         slot_cursors[slot.index] = end_minutes
     score_breakdown.append(
-        _score_breakdown(task, slot, fixture.date, fixture.solver_config, is_fixed=True)
+        _base_score_breakdown(
+            task, slot, fixture.date, fixture.solver_config, is_fixed=True
+        )
     )
 
 
@@ -221,7 +223,7 @@ def _fill_timeline_slots(
     score_breakdown: list[HumanScoreBreakdown],
     unscheduled: dict[str, str],
 ) -> None:
-    task_by_id = {task.id: task for task in fixture.tasks}
+    tasks_by_id = {task.id: task for task in fixture.tasks}
     for slot_position, slot in enumerate(sorted_slots):
         future_slots = sorted_slots[slot_position + 1 :]
         while True:
@@ -250,11 +252,27 @@ def _fill_timeline_slots(
             task = max(
                 candidates,
                 key=lambda candidate: _timeline_candidate_key(
-                    candidate, slot, fixture.date, fixture.solver_config
+                    candidate,
+                    slot,
+                    fixture,
+                    scheduled,
+                    tasks_by_id,
+                    slot_usage,
+                    candidate_start,
                 ),
             )
             start_minutes = slot_cursors[slot.index]
             end_minutes = start_minutes + task.remaining_minutes
+            score = _score_breakdown(
+                task,
+                slot,
+                fixture,
+                is_fixed=False,
+                scheduled=scheduled,
+                tasks_by_id=tasks_by_id,
+                slot_usage=slot_usage,
+                start_minutes=start_minutes,
+            )
             scheduled[task.id] = HumanScheduleBlock(
                 task_id=task.id,
                 slot_index=slot.index,
@@ -264,18 +282,10 @@ def _fill_timeline_slots(
             )
             slot_usage[slot.index] += task.remaining_minutes
             slot_cursors[slot.index] = end_minutes
-            score_breakdown.append(
-                _score_breakdown(
-                    task,
-                    slot,
-                    fixture.date,
-                    fixture.solver_config,
-                    is_fixed=False,
-                )
-            )
+            score_breakdown.append(score)
 
     for task_id, prerequisites in fixture.task_dependencies.items():
-        task = task_by_id.get(task_id)
+        task = tasks_by_id.get(task_id)
         if task and task.id not in scheduled and task.id not in unscheduled:
             missing = [prereq for prereq in prerequisites if prereq not in scheduled]
             if missing:
@@ -327,7 +337,9 @@ def _fill_legacy_slots(
         )
         slot_usage[slot.index] += task.remaining_minutes
         score_breakdown.append(
-            _score_breakdown(task, slot, fixture.date, fixture.solver_config, is_fixed=False)
+            _base_score_breakdown(
+                task, slot, fixture.date, fixture.solver_config, is_fixed=False
+            )
         )
 
 
@@ -415,12 +427,24 @@ def _unscheduled_reason(
 def _timeline_candidate_key(
     task: HumanTask,
     slot: HumanTimeSlot,
-    schedule_date: date,
-    config: HumanDailySolverConfig,
+    fixture: HumanDailyFixture,
+    scheduled: dict[str, HumanScheduleBlock],
+    tasks_by_id: dict[str, HumanTask],
+    slot_usage: dict[int, int],
+    start_minutes: int,
 ) -> tuple[int, int, int, str]:
-    breakdown = _score_breakdown(task, slot, schedule_date, config, is_fixed=False)
+    breakdown = _score_breakdown(
+        task,
+        slot,
+        fixture,
+        is_fixed=False,
+        scheduled=scheduled,
+        tasks_by_id=tasks_by_id,
+        slot_usage=slot_usage,
+        start_minutes=start_minutes,
+    )
     due_key = -9999 if task.due_at is None else -(
-        task.due_at.date() - schedule_date
+        task.due_at.date() - fixture.date
     ).days
     return (breakdown.total, due_key, -task.priority, task.id)
 
@@ -431,11 +455,50 @@ def _legacy_candidate_key(
     schedule_date: date,
     config: HumanDailySolverConfig,
 ) -> tuple[int, int, str]:
-    breakdown = _score_breakdown(task, slot, schedule_date, config, is_fixed=False)
+    breakdown = _base_score_breakdown(
+        task, slot, schedule_date, config, is_fixed=False
+    )
     return (breakdown.total, -slot.index, task.id)
 
 
 def _score_breakdown(
+    task: HumanTask,
+    slot: HumanTimeSlot,
+    fixture: HumanDailyFixture,
+    *,
+    is_fixed: bool,
+    scheduled: dict[str, HumanScheduleBlock] | None = None,
+    tasks_by_id: dict[str, HumanTask] | None = None,
+    slot_usage: dict[int, int] | None = None,
+    start_minutes: int | None = None,
+) -> HumanScoreBreakdown:
+    config = fixture.solver_config
+    breakdown = _base_score_breakdown(
+        task, slot, fixture.date, config, is_fixed=is_fixed
+    )
+    if scheduled is None or tasks_by_id is None or slot_usage is None or start_minutes is None:
+        return breakdown
+
+    components = dict(breakdown.components)
+    components["dependency_unlock"] = _dependency_unlock_score(
+        task, fixture, scheduled, config
+    )
+    components["project_switch"] = -_project_switch_penalty(
+        task, scheduled, tasks_by_id, start_minutes, config
+    )
+    components["continuous_work"] = -_continuous_work_penalty(
+        task, scheduled, start_minutes, config
+    )
+    components["gap_fill"] = _gap_fill_score(task, slot, slot_usage, config)
+    return HumanScoreBreakdown(
+        task_id=task.id,
+        slot_index=slot.index,
+        total=sum(components.values()),
+        components=components,
+    )
+
+
+def _base_score_breakdown(
     task: HumanTask,
     slot: HumanTimeSlot,
     schedule_date: date,
@@ -456,6 +519,10 @@ def _score_breakdown(
         "kind": kind,
         "deadline": deadline,
         "fixed": fixed,
+        "dependency_unlock": 0,
+        "project_switch": 0,
+        "continuous_work": 0,
+        "gap_fill": 0,
     }
     return HumanScoreBreakdown(
         task_id=task.id,
@@ -463,6 +530,119 @@ def _score_breakdown(
         total=sum(components.values()),
         components=components,
     )
+
+
+def _dependency_unlock_score(
+    task: HumanTask,
+    fixture: HumanDailyFixture,
+    scheduled: dict[str, HumanScheduleBlock],
+    config: HumanDailySolverConfig,
+) -> int:
+    unlocked_count = 0
+    for dependent_id, prerequisites in fixture.task_dependencies.items():
+        if task.id not in prerequisites or dependent_id in scheduled:
+            continue
+        other_prerequisites = [item for item in prerequisites if item != task.id]
+        if all(prereq in scheduled for prereq in other_prerequisites):
+            unlocked_count += 1
+    return unlocked_count * config.dependency_unlock_score
+
+
+def _project_switch_penalty(
+    task: HumanTask,
+    scheduled: dict[str, HumanScheduleBlock],
+    tasks_by_id: dict[str, HumanTask],
+    start_minutes: int,
+    config: HumanDailySolverConfig,
+) -> int:
+    if config.project_switch_penalty == 0 or not task.project_id:
+        return 0
+    previous_block = _previous_block(scheduled, start_minutes)
+    if previous_block is None:
+        return 0
+    gap_minutes = start_minutes - _minutes(previous_block.end)
+    if (
+        gap_minutes > 0
+        and gap_minutes >= config.project_switch_reset_gap_minutes
+    ):
+        return 0
+    previous_task = tasks_by_id.get(previous_block.task_id)
+    if previous_task is None or not previous_task.project_id:
+        return 0
+    if previous_task.project_id == task.project_id:
+        return 0
+    return config.project_switch_penalty
+
+
+def _continuous_work_penalty(
+    task: HumanTask,
+    scheduled: dict[str, HumanScheduleBlock],
+    start_minutes: int,
+    config: HumanDailySolverConfig,
+) -> int:
+    if (
+        config.long_continuous_penalty == 0
+        or config.long_continuous_threshold_minutes == 0
+    ):
+        return 0
+    continuous_minutes = _continuous_work_minutes_before(
+        scheduled, start_minutes, config.break_reset_gap_minutes
+    )
+    if continuous_minutes + task.remaining_minutes <= config.long_continuous_threshold_minutes:
+        return 0
+    return config.long_continuous_penalty
+
+
+def _gap_fill_score(
+    task: HumanTask,
+    slot: HumanTimeSlot,
+    slot_usage: dict[int, int],
+    config: HumanDailySolverConfig,
+) -> int:
+    if config.small_gap_fill_score == 0:
+        return 0
+    remaining_before = slot.effective_capacity_minutes - slot_usage[slot.index]
+    remaining_after = remaining_before - task.remaining_minutes
+    if 0 <= remaining_after <= config.small_gap_minutes:
+        return config.small_gap_fill_score
+    return 0
+
+
+def _previous_block(
+    scheduled: dict[str, HumanScheduleBlock],
+    start_minutes: int,
+) -> HumanScheduleBlock | None:
+    previous_blocks = [
+        block for block in scheduled.values() if _minutes(block.end) <= start_minutes
+    ]
+    if not previous_blocks:
+        return None
+    return max(previous_blocks, key=lambda block: (_minutes(block.end), block.task_id))
+
+
+def _continuous_work_minutes_before(
+    scheduled: dict[str, HumanScheduleBlock],
+    start_minutes: int,
+    break_reset_gap_minutes: int,
+) -> int:
+    continuous_minutes = 0
+    cursor_minutes = start_minutes
+    previous_blocks = sorted(
+        (
+            block
+            for block in scheduled.values()
+            if _minutes(block.end) <= start_minutes
+        ),
+        key=lambda block: (_minutes(block.end), block.task_id),
+        reverse=True,
+    )
+    for block in previous_blocks:
+        gap_minutes = cursor_minutes - _minutes(block.end)
+        if gap_minutes > 0 and gap_minutes >= break_reset_gap_minutes:
+            break
+        continuous_minutes += block.duration_minutes
+        cursor_minutes = _minutes(block.start)
+    return continuous_minutes
 
 
 def _deadline_score(

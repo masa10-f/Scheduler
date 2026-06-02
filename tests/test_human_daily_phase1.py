@@ -6,12 +6,15 @@ import unittest
 
 from scheduler.human import (
     HumanDailyFixture,
+    HumanDailySolverConfig,
     HumanFixedAssignment,
     HumanTask,
     HumanTimeSlot,
     HumanWorkKind,
     compare_human_daily_solvers,
+    format_human_daily_compact,
     format_human_daily_comparison,
+    human_daily_fixture_from_dict,
     load_human_daily_fixture,
     solve_human_daily_legacy,
     solve_human_daily_timeline,
@@ -27,7 +30,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
 
         self.assertEqual(fixture.date.isoformat(), "2026-05-20")
         self.assertEqual(fixture.metadata["name"], "daily_basic")
-        self.assertEqual(len(fixture.tasks), 4)
+        self.assertGreaterEqual(len(fixture.tasks), 12)
         self.assertEqual(fixture.tasks[0].priority, 1)
         self.assertEqual(fixture.time_slots[0].work_kind.value, "focused_work")
 
@@ -203,6 +206,337 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertNotIn("zero_duration_fixed", scheduled_ids)
         self.assertIn("normal_task", scheduled_ids)
 
+    def test_timeline_solver_prefers_task_that_unlocks_dependencies(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            task_dependencies={"dependent": ["prerequisite"]},
+            tasks=[
+                HumanTask(
+                    id="unrelated",
+                    title="Unrelated implementation task",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="prerequisite",
+                    title="Prerequisite design note",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent patch",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[0].task_id, "prerequisite")
+        score = next(
+            item for item in report.score_breakdown if item.task_id == "prerequisite"
+        )
+        self.assertEqual(score.components["dependency_unlock"], 3)
+
+    def test_timeline_solver_penalizes_short_gap_project_switches(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(project_switch_penalty=10),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="alpha_fixed",
+                    title="Alpha setup",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                ),
+                HumanTask(
+                    id="beta_followup",
+                    title="Beta follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="beta",
+                ),
+                HumanTask(
+                    id="alpha_followup",
+                    title="Alpha follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[1].task_id, "alpha_followup")
+        beta_score = next(
+            item for item in report.score_breakdown if item.task_id == "beta_followup"
+        )
+        self.assertEqual(beta_score.components["project_switch"], -10)
+
+    def test_zero_project_switch_reset_gap_still_penalizes_contiguous_switch(
+        self,
+    ) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                project_switch_penalty=10,
+                project_switch_reset_gap_minutes=0,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="alpha_fixed",
+                    title="Alpha setup",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                ),
+                HumanTask(
+                    id="beta_followup",
+                    title="Beta follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="beta",
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        beta_score = next(
+            item for item in report.score_breakdown if item.task_id == "beta_followup"
+        )
+        self.assertEqual(beta_score.components["project_switch"], -10)
+
+    def test_timeline_solver_penalizes_long_continuous_work(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                long_continuous_threshold_minutes=120,
+                long_continuous_penalty=8,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="deep_work", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="deep_work",
+                    title="Deep work",
+                    remaining_minutes=100,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="long_followup",
+                    title="Long follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="short_followup",
+                    title="Short follow-up",
+                    remaining_minutes=10,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[1].task_id, "short_followup")
+        long_score = next(
+            item for item in report.score_breakdown if item.task_id == "long_followup"
+        )
+        self.assertEqual(long_score.components["continuous_work"], -8)
+
+    def test_zero_break_reset_gap_still_counts_contiguous_work(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                break_reset_gap_minutes=0,
+                long_continuous_threshold_minutes=120,
+                long_continuous_penalty=8,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 10),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="deep_work", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="deep_work",
+                    title="Deep work",
+                    remaining_minutes=100,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="long_followup",
+                    title="Long follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        long_score = next(
+            item for item in report.score_breakdown if item.task_id == "long_followup"
+        )
+        self.assertEqual(long_score.components["continuous_work"], -8)
+
+    def test_timeline_solver_rewards_small_gap_fill(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                small_gap_minutes=0,
+                small_gap_fill_score=10,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="fixed_work", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="fixed_work",
+                    title="Fixed work",
+                    remaining_minutes=40,
+                    priority=1,
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                ),
+                HumanTask(
+                    id="high_priority_task",
+                    title="High priority short task",
+                    remaining_minutes=10,
+                    priority=1,
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                ),
+                HumanTask(
+                    id="gap_filler",
+                    title="Exact gap filler",
+                    remaining_minutes=20,
+                    priority=3,
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[1].task_id, "gap_filler")
+        score = next(
+            item for item in report.score_breakdown if item.task_id == "gap_filler"
+        )
+        self.assertEqual(score.components["gap_fill"], 10)
+
+    def test_parses_phase_two_solver_config_fields(self) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "time_slots": [
+                    {
+                        "index": 0,
+                        "start": "09:00",
+                        "end": "10:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "solver_config": {
+                    "dependency_unlock_score": 7,
+                    "project_switch_penalty": 8,
+                    "project_switch_reset_gap_minutes": 45,
+                    "long_continuous_threshold_minutes": 150,
+                    "long_continuous_penalty": 9,
+                    "break_reset_gap_minutes": 25,
+                    "small_gap_minutes": 5,
+                    "small_gap_fill_score": 6,
+                },
+            }
+        )
+
+        self.assertEqual(fixture.solver_config.dependency_unlock_score, 7)
+        self.assertEqual(fixture.solver_config.project_switch_penalty, 8)
+        self.assertEqual(fixture.solver_config.project_switch_reset_gap_minutes, 45)
+        self.assertEqual(fixture.solver_config.long_continuous_threshold_minutes, 150)
+        self.assertEqual(fixture.solver_config.long_continuous_penalty, 9)
+        self.assertEqual(fixture.solver_config.break_reset_gap_minutes, 25)
+        self.assertEqual(fixture.solver_config.small_gap_minutes, 5)
+        self.assertEqual(fixture.solver_config.small_gap_fill_score, 6)
+
     def test_comparison_report_includes_review_fields(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
         comparison = compare_human_daily_solvers(fixture)
@@ -214,6 +548,18 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertIn("score breakdown:", output)
         self.assertIn("constraint violations:", output)
         self.assertIn("solver settings:", output)
+
+    def test_compact_report_keeps_terminal_output_short(self) -> None:
+        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
+        comparison = compare_human_daily_solvers(fixture)
+        output = format_human_daily_compact(comparison)
+
+        self.assertIn("solver: timeline_greedy", output)
+        self.assertIn("Timeline", output)
+        self.assertIn("Unscheduled", output)
+        self.assertIn("Use --verbose", output)
+        self.assertNotIn("score breakdown:", output)
+        self.assertNotIn("solver settings:", output)
 
 
 if __name__ == "__main__":

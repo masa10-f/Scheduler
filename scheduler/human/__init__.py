@@ -17,7 +17,11 @@ from .model import (
     HumanWorkKind,
 )
 from .io import human_daily_fixture_from_dict, load_human_daily_fixture
-from .report import format_human_daily_comparison, format_human_daily_report
+from .report import (
+    format_human_daily_compact,
+    format_human_daily_comparison,
+    format_human_daily_report,
+)
 from .solver import (
     compare_human_daily_solvers,
     solve_human_daily_legacy,
@@ -40,6 +44,7 @@ __all__ = [
     "HumanUnscheduledTask",
     "HumanWorkKind",
     "compare_human_daily_solvers",
+    "format_human_daily_compact",
     "format_human_daily_comparison",
     "format_human_daily_report",
     "human_daily_fixture_from_dict",
