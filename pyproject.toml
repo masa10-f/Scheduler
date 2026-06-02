@@ -10,6 +10,7 @@ dependencies = [
 
 [project.optional-dependencies]
 cp-sat = ["ortools>=9.6"]
+docs = ["sphinx>=7.0"]
 
 [build-system]
 requires = ["hatchling>=1.18"]
