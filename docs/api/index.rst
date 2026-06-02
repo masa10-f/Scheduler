@@ -6,3 +6,4 @@ API Reference
 
    scheduler
    human
+   human-solver-parameters

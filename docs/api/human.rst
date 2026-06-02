@@ -4,6 +4,9 @@ Human Daily Scheduling API
 The ``scheduler.human`` namespace is experimental and intended for
 HumanCompiler-oriented daily scheduling adapters.
 
+See :doc:`human-solver-parameters` for detailed guidance on the tunable
+``HumanDailySolverConfig`` parameters.
+
 Package Exports
 ---------------
 
