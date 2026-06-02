@@ -561,7 +561,10 @@ def _project_switch_penalty(
     if previous_block is None:
         return 0
     gap_minutes = start_minutes - _minutes(previous_block.end)
-    if gap_minutes >= config.project_switch_reset_gap_minutes:
+    if (
+        gap_minutes > 0
+        and gap_minutes >= config.project_switch_reset_gap_minutes
+    ):
         return 0
     previous_task = tasks_by_id.get(previous_block.task_id)
     if previous_task is None or not previous_task.project_id:
@@ -635,7 +638,7 @@ def _continuous_work_minutes_before(
     )
     for block in previous_blocks:
         gap_minutes = cursor_minutes - _minutes(block.end)
-        if gap_minutes >= break_reset_gap_minutes:
+        if gap_minutes > 0 and gap_minutes >= break_reset_gap_minutes:
             break
         continuous_minutes += block.duration_minutes
         cursor_minutes = _minutes(block.start)

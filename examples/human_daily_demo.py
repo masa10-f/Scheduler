@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
-import sys
 
 from scheduler.human import (
     compare_human_daily_solvers,
+    format_human_daily_compact,
     format_human_daily_comparison,
     load_human_daily_fixture,
 )
@@ -13,11 +14,23 @@ from scheduler.human import (
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     default_path = repo_root / "samples" / "human" / "daily_basic.yaml"
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else default_path
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", nargs="?", type=Path, default=default_path)
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="print solver settings and full score breakdown",
+    )
+    args = parser.parse_args()
 
-    fixture = load_human_daily_fixture(path)
+    fixture = load_human_daily_fixture(args.path)
     comparison = compare_human_daily_solvers(fixture)
-    print(format_human_daily_comparison(comparison), end="")
+    formatter = (
+        format_human_daily_comparison
+        if args.verbose
+        else format_human_daily_compact
+    )
+    print(formatter(comparison), end="")
     return 0
 
 

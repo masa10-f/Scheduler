@@ -12,6 +12,7 @@ from scheduler.human import (
     HumanTimeSlot,
     HumanWorkKind,
     compare_human_daily_solvers,
+    format_human_daily_compact,
     format_human_daily_comparison,
     human_daily_fixture_from_dict,
     load_human_daily_fixture,
@@ -29,7 +30,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
 
         self.assertEqual(fixture.date.isoformat(), "2026-05-20")
         self.assertEqual(fixture.metadata["name"], "daily_basic")
-        self.assertEqual(len(fixture.tasks), 4)
+        self.assertGreaterEqual(len(fixture.tasks), 12)
         self.assertEqual(fixture.tasks[0].priority, 1)
         self.assertEqual(fixture.time_slots[0].work_kind.value, "focused_work")
 
@@ -301,6 +302,53 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         )
         self.assertEqual(beta_score.components["project_switch"], -10)
 
+    def test_zero_project_switch_reset_gap_still_penalizes_contiguous_switch(
+        self,
+    ) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                project_switch_penalty=10,
+                project_switch_reset_gap_minutes=0,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="alpha_fixed",
+                    title="Alpha setup",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                ),
+                HumanTask(
+                    id="beta_followup",
+                    title="Beta follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="beta",
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        beta_score = next(
+            item for item in report.score_breakdown if item.task_id == "beta_followup"
+        )
+        self.assertEqual(beta_score.components["project_switch"], -10)
+
     def test_timeline_solver_penalizes_long_continuous_work(self) -> None:
         fixture = HumanDailyFixture(
             date=date(2026, 5, 20),
@@ -347,6 +395,50 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         report = solve_human_daily_timeline(fixture)
 
         self.assertEqual(report.plan.blocks[1].task_id, "short_followup")
+        long_score = next(
+            item for item in report.score_breakdown if item.task_id == "long_followup"
+        )
+        self.assertEqual(long_score.components["continuous_work"], -8)
+
+    def test_zero_break_reset_gap_still_counts_contiguous_work(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                break_reset_gap_minutes=0,
+                long_continuous_threshold_minutes=120,
+                long_continuous_penalty=8,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 10),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="deep_work", slot_index=0)
+            ],
+            tasks=[
+                HumanTask(
+                    id="deep_work",
+                    title="Deep work",
+                    remaining_minutes=100,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="long_followup",
+                    title="Long follow-up",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
         long_score = next(
             item for item in report.score_breakdown if item.task_id == "long_followup"
         )
@@ -456,6 +548,18 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertIn("score breakdown:", output)
         self.assertIn("constraint violations:", output)
         self.assertIn("solver settings:", output)
+
+    def test_compact_report_keeps_terminal_output_short(self) -> None:
+        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
+        comparison = compare_human_daily_solvers(fixture)
+        output = format_human_daily_compact(comparison)
+
+        self.assertIn("solver: timeline_greedy", output)
+        self.assertIn("Timeline", output)
+        self.assertIn("Unscheduled", output)
+        self.assertIn("Use --verbose", output)
+        self.assertNotIn("score breakdown:", output)
+        self.assertNotIn("solver settings:", output)
 
 
 if __name__ == "__main__":
