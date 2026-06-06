@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, time
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from scheduler.human import (
@@ -16,12 +20,17 @@ from scheduler.human import (
     format_human_daily_comparison,
     human_daily_fixture_from_dict,
     load_human_daily_fixture,
+    load_human_daily_solver_config,
+    run_human_daily_review,
     solve_human_daily_legacy,
     solve_human_daily_timeline,
+    write_human_daily_review,
 )
 
 
 SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples" / "human"
+REPO_ROOT = SAMPLES_DIR.parents[1]
+EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 class HumanDailyFixtureTests(unittest.TestCase):
@@ -560,6 +569,156 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertIn("Use --verbose", output)
         self.assertNotIn("score breakdown:", output)
         self.assertNotIn("solver settings:", output)
+
+
+class HumanDailyReviewTests(unittest.TestCase):
+    def test_review_runs_multiple_fixtures_in_one_output(self) -> None:
+        output = run_human_daily_review(
+            [
+                SAMPLES_DIR / "daily_mixed_energy.yaml",
+                SAMPLES_DIR / "daily_deadline_pressure.yaml",
+            ]
+        )
+
+        self.assertIn("Human daily review", output)
+        self.assertIn("fixtures: 2", output)
+        self.assertIn("daily_mixed_energy", output)
+        self.assertIn("daily_deadline_pressure", output)
+
+    def test_review_writes_markdown_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "review.md"
+
+            rendered = write_human_daily_review(
+                [SAMPLES_DIR / "daily_mixed_energy.yaml"],
+                output_path,
+                output_format="markdown",
+            )
+
+            self.assertEqual(output_path.read_text(encoding="utf-8"), rendered)
+            self.assertIn("# Human Daily Review", rendered)
+            self.assertIn("```text", rendered)
+            self.assertIn("daily_mixed_energy", rendered)
+
+    def test_review_applies_yaml_solver_config_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "fixture.yaml"
+            config_path = Path(directory) / "config.yaml"
+            fixture_path.write_text(
+                "\n".join(
+                    [
+                        'date: "2026-05-20"',
+                        "metadata:",
+                        "  name: override_fixture",
+                        "time_slots:",
+                        "  - index: 0",
+                        '    start: "09:00"',
+                        '    end: "10:00"',
+                        "    work_kind: focused_work",
+                        "tasks:",
+                        "  - id: focused_task",
+                        "    title: Focused task",
+                        "    remaining_minutes: 30",
+                        "    priority: 1",
+                        "    work_kind: focused_work",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "solver_config:",
+                        "  kind_match_score: 20",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            config = load_human_daily_solver_config(config_path)
+
+            default_output = run_human_daily_review([fixture_path])
+            override_output = run_human_daily_review(
+                [fixture_path],
+                config_override=config,
+            )
+
+            self.assertEqual(config.kind_match_score, 20)
+            self.assertIn("override_fixture", override_output)
+            self.assertNotEqual(default_output, override_output)
+
+    def test_review_cli_writes_markdown_with_config_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "review.md"
+            default_output_path = Path(directory) / "default-review.md"
+            config_path = Path(directory) / "config.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "solver_config:",
+                        "  kind_match_score: 20",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            existing_pythonpath = env.get("PYTHONPATH")
+            env["PYTHONPATH"] = (
+                str(REPO_ROOT)
+                if not existing_pythonpath
+                else str(REPO_ROOT) + os.pathsep + existing_pythonpath
+            )
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(EXAMPLES_DIR / "human_daily_review.py"),
+                    str(SAMPLES_DIR / "daily_mixed_energy.yaml"),
+                    "--format",
+                    "markdown",
+                    "--output",
+                    str(default_output_path),
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EXAMPLES_DIR / "human_daily_review.py"),
+                    str(SAMPLES_DIR / "daily_mixed_energy.yaml"),
+                    "--format",
+                    "markdown",
+                    "--config",
+                    str(config_path),
+                    "--output",
+                    str(output_path),
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+
+            rendered = output_path.read_text(encoding="utf-8")
+            self.assertEqual(result.stdout, "")
+            self.assertIn("# Human Daily Review", rendered)
+            self.assertIn("daily_mixed_energy", rendered)
+            self.assertIn("solver: `timeline_greedy`", rendered)
+            self.assertNotEqual(
+                default_output_path.read_text(encoding="utf-8"),
+                rendered,
+            )
+
+    def test_review_requires_at_least_one_fixture(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least one fixture"):
+            run_human_daily_review([])
 
 
 if __name__ == "__main__":

@@ -22,6 +22,12 @@ def load_human_daily_fixture(path: str | Path) -> HumanDailyFixture:
     return human_daily_fixture_from_dict(data)
 
 
+def load_human_daily_solver_config(path: str | Path) -> HumanDailySolverConfig:
+    data = _load_yaml(path)
+    raw_config = data.get("solver_config", data)
+    return human_daily_solver_config_from_dict(raw_config)
+
+
 def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
     return HumanDailyFixture(
         date=_parse_date(_required(data, "date")),
@@ -32,6 +38,12 @@ def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
         solver_config=_parse_solver_config(data.get("solver_config", {})),
         metadata=_parse_metadata(data.get("metadata", {})),
     )
+
+
+def human_daily_solver_config_from_dict(
+    data: Mapping[str, Any],
+) -> HumanDailySolverConfig:
+    return _parse_solver_config(data)
 
 
 def _load_yaml(path: str | Path) -> Mapping[str, Any]:
