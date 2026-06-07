@@ -8,6 +8,11 @@ dependencies = [
   "pyyaml>=6.0",
 ]
 
+[dependency-groups]
+dev = [
+  "pytest>=7.4",
+]
+
 [project.optional-dependencies]
 cp-sat = ["ortools>=9.6"]
 docs = ["sphinx>=7.0"]
