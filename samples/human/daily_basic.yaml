@@ -1,7 +1,8 @@
-date: "2026-05-20"
+date: "2025-09-18"
+task_database: data/taskagent_common_database.yaml
 metadata:
   name: daily_basic
-  purpose: richer demo fixture for timeline scheduling tradeoffs
+  purpose: baseline review using the shared TaskAgent task database
 
 solver_config:
   kind_match_score: 8
@@ -37,138 +38,6 @@ time_slots:
     work_kind: light_work
 
 fixed_assignments:
-  - task_id: daily_planning_review
+  - task_id: tutorial_writing
     slot_index: 2
-    duration_minutes: 20
-
-task_dependencies:
-  scheduler_scoring_patch:
-    - scheduler_design_notes
-  scheduler_regression_tests:
-    - scheduler_scoring_patch
-  paper_summary:
-    - theorem_notes
-  blocked_partner_review:
-    - missing_partner_feedback
-
-tasks:
-  - id: scheduler_design_notes
-    title: Finalize scoring design notes
-    remaining_minutes: 45
-    priority: 1
-    work_kind: focused_work
-    due_at: "2026-05-20T12:00:00"
-    project_id: software-dev
-    goal_id: scheduler-quality
-  - id: scheduler_scoring_patch
-    title: Implement scheduler scoring patch
-    remaining_minutes: 60
-    priority: 1
-    work_kind: focused_work
-    due_at: "2026-05-21T17:00:00"
-    project_id: software-dev
-    goal_id: scheduler-quality
-  - id: scheduler_regression_tests
-    title: Add regression coverage for timeline scoring
-    remaining_minutes: 30
-    priority: 2
-    work_kind: focused_work
-    due_at: "2026-05-22T17:00:00"
-    project_id: software-dev
-    goal_id: scheduler-quality
-  - id: optics_run_plan
-    title: Review optical experiment run plan
-    remaining_minutes: 45
-    priority: 2
-    work_kind: focused_work
-    due_at: "2026-05-20T12:00:00"
-    project_id: optics-lab
-    goal_id: alignment-run
-  - id: theorem_notes
-    title: Read theorem proof notes
-    remaining_minutes: 60
-    priority: 3
-    work_kind: study
-    due_at: "2026-05-27T17:00:00"
-    project_id: theory-research
-    goal_id: paper-draft
-  - id: paper_summary
-    title: Summarize theorem notes for the paper draft
-    remaining_minutes: 45
-    priority: 2
-    work_kind: study
-    due_at: "2026-05-21T17:00:00"
-    project_id: theory-research
-    goal_id: paper-draft
-  - id: compliance_training
-    title: Finish required lab safety module
-    remaining_minutes: 40
-    priority: 2
-    work_kind: study
-    due_at: "2026-05-20T17:00:00"
-    project_id: compliance
-    goal_id: lab-access
-  - id: architecture_article
-    title: Read architecture notes for next sprint
-    remaining_minutes: 75
-    priority: 4
-    work_kind: study
-    due_at: "2026-05-24T17:00:00"
-    project_id: software-dev
-    goal_id: scheduler-quality
-  - id: quarterly_strategy_deck
-    title: Draft quarterly strategy deck
-    remaining_minutes: 180
-    priority: 3
-    work_kind: study
-    due_at: "2026-05-26T17:00:00"
-    project_id: planning
-    goal_id: quarterly-review
-  - id: daily_planning_review
-    title: Review today's plan and notes
-    remaining_minutes: 20
-    priority: 1
-    work_kind: light_work
-    due_at: "2026-05-20T16:30:00"
-    project_id: team-management
-    goal_id: daily-control
-  - id: customer_reply
-    title: Reply to integration customer question
-    remaining_minutes: 25
-    priority: 1
-    work_kind: light_work
-    due_at: "2026-05-23T17:00:00"
-    project_id: team-management
-    goal_id: communication
-  - id: team_followups
-    title: Clear team follow-ups and small replies
-    remaining_minutes: 30
-    priority: 4
-    work_kind: light_work
-    source: quick_task
-    project_id: team-management
-    goal_id: communication
-  - id: experiment_queue_triage
-    title: Triage experiment and sprint issues
-    remaining_minutes: 45
-    priority: 1
-    work_kind: light_work
-    due_at: "2026-05-23T17:00:00"
-    project_id: team-management
-    goal_id: queue
-  - id: invoice_cleanup
-    title: File weekly admin receipts
-    remaining_minutes: 20
-    priority: 5
-    work_kind: light_work
-    source: weekly_recurring_task
-    project_id: personal-ops
-    goal_id: admin
-  - id: blocked_partner_review
-    title: Review partner draft after feedback arrives
-    remaining_minutes: 30
-    priority: 2
-    work_kind: light_work
-    due_at: "2026-05-20T17:30:00"
-    project_id: partner-work
-    goal_id: external-review
+    duration_minutes: 30

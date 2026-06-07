@@ -37,11 +37,23 @@ class HumanDailyFixtureTests(unittest.TestCase):
     def test_loads_editable_yaml_fixture(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
 
-        self.assertEqual(fixture.date.isoformat(), "2026-05-20")
+        self.assertEqual(fixture.date.isoformat(), "2025-09-18")
         self.assertEqual(fixture.metadata["name"], "daily_basic")
-        self.assertGreaterEqual(len(fixture.tasks), 12)
+        self.assertGreaterEqual(len(fixture.tasks), 20)
         self.assertEqual(fixture.tasks[0].priority, 1)
         self.assertEqual(fixture.time_slots[0].work_kind.value, "focused_work")
+        self.assertIn("stim_erasure_compiler", fixture.task_dependencies)
+
+    def test_loads_tasks_from_relative_task_database(self) -> None:
+        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
+        task_ids = {task.id for task in fixture.tasks}
+
+        self.assertIn("surface_erasure_circuit", task_ids)
+        self.assertIn("logic_state_homodyne", fixture.task_dependencies)
+        self.assertEqual(
+            fixture.task_dependencies["logic_state_homodyne"],
+            ["homodyne_distribution"],
+        )
 
 
 class HumanDailySolverComparisonTests(unittest.TestCase):
@@ -59,8 +71,34 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertGreater(starts_by_slot[0].count("09:00"), 1)
 
     def test_timeline_solver_uses_sequential_starts_inside_slot(self) -> None:
-        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
-        report = compare_human_daily_solvers(fixture).reports["timeline_greedy"]
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="first",
+                    title="First",
+                    remaining_minutes=60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="second",
+                    title="Second",
+                    remaining_minutes=60,
+                    priority=2,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+        report = solve_human_daily_timeline(fixture)
 
         slot_zero_blocks = [
             block for block in report.plan.blocks if block.slot_index == 0
@@ -77,10 +115,10 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         unscheduled = {item.task_id: item.reason for item in report.unscheduled_tasks}
         scheduled_ids = {block.task_id for block in report.plan.blocks}
 
-        self.assertIn("paper_review", scheduled_ids)
-        self.assertIn("proof_outline", scheduled_ids)
+        self.assertIn("surface_erasure_circuit", scheduled_ids)
+        self.assertIn("stim_erasure_compiler", scheduled_ids)
         self.assertEqual(
-            unscheduled["blocked_experiment_followup"], "dependency_not_scheduled"
+            unscheduled["mid_ir_sync_design"], "dependency_not_scheduled"
         )
 
     def test_timeline_solver_waits_for_prerequisite_finish_time(self) -> None:

@@ -23,6 +23,10 @@ Run a batch review and save a snapshot:
 uv run python examples/human_daily_review.py samples/human/*.yaml --format markdown --output human_daily_review.md
 ```
 
+The sample review fixtures share the same curated TaskAgent task database at
+`samples/human/data/taskagent_common_database.yaml`. The fixture files vary the
+available time windows and constraints, not the underlying task set.
+
 Apply a shared solver config override to every fixture in the review:
 
 ```bash
