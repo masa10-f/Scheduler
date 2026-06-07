@@ -1,0 +1,38 @@
+date: "2025-09-18"
+task_database: data/taskagent_common_database.yaml
+metadata:
+  name: daily_flexible_normal
+  purpose: flexible availability with lunch and afternoon mixed work
+
+solver_config:
+  kind_match_score: 8
+  kind_mismatch_score: 1
+  priority_score_base: 6
+  deadline_soon_days: 2
+  deadline_score: 4
+  overdue_score: 20
+  dependency_unlock_score: 5
+  project_switch_penalty: 6
+  project_switch_reset_gap_minutes: 45
+  long_continuous_threshold_minutes: 90
+  long_continuous_penalty: 7
+  break_reset_gap_minutes: 20
+  small_gap_minutes: 15
+  small_gap_fill_score: 3
+  fixed_assignment_score: 100
+
+availability_windows:
+  - start: "09:00"
+    end: "12:00"
+    work_kind: focused_work
+    capacity_minutes: 150
+  - start: "13:00"
+    end: "18:00"
+    work_kind: light_work
+    capacity_minutes: 240
+
+fixed_events:
+  - title: Lunch
+    start: "12:00"
+    end: "13:00"
+

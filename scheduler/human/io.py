@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from .model import (
+    HumanAvailabilityWindow,
     HumanDailyFixture,
     HumanDailySolverConfig,
+    HumanFixedEvent,
+    HumanFlexibleDailyFixture,
     HumanFixedAssignment,
     HumanMetadataValue,
     HumanTask,
@@ -32,6 +35,10 @@ def load_human_daily_solver_config(path: str | Path) -> HumanDailySolverConfig:
 
 
 def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
+    if data.get("time_slots") is None and data.get("availability_windows") is not None:
+        return compile_human_flexible_daily_fixture(
+            human_flexible_daily_fixture_from_dict(data)
+        )
     return HumanDailyFixture(
         date=_parse_date(_required(data, "date")),
         tasks=_parse_tasks(_required(data, "tasks")),
@@ -43,10 +50,47 @@ def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
     )
 
 
+def human_flexible_daily_fixture_from_dict(
+    data: Mapping[str, Any],
+) -> HumanFlexibleDailyFixture:
+    return HumanFlexibleDailyFixture(
+        date=_parse_date(_required(data, "date")),
+        tasks=_parse_tasks(_required(data, "tasks")),
+        availability_windows=_parse_availability_windows(
+            _required(data, "availability_windows")
+        ),
+        fixed_events=_parse_fixed_events(data.get("fixed_events", [])),
+        now=_parse_datetime_or_none(data.get("now")),
+        fixed_assignments=_parse_fixed_assignments(data.get("fixed_assignments", [])),
+        task_dependencies=_parse_task_dependencies(data.get("task_dependencies", {})),
+        solver_config=_parse_solver_config(data.get("solver_config", {})),
+        metadata=_parse_metadata(data.get("metadata", {})),
+    )
+
+
 def human_daily_solver_config_from_dict(
     data: Mapping[str, Any],
 ) -> HumanDailySolverConfig:
     return _parse_solver_config(data)
+
+
+def compile_human_flexible_daily_fixture(
+    fixture: HumanFlexibleDailyFixture,
+) -> HumanDailyFixture:
+    return HumanDailyFixture(
+        date=fixture.date,
+        tasks=fixture.tasks,
+        time_slots=_generate_time_slots(
+            fixture.availability_windows,
+            fixture.fixed_events,
+            fixture.date,
+            fixture.now,
+        ),
+        fixed_assignments=fixture.fixed_assignments,
+        task_dependencies=fixture.task_dependencies,
+        solver_config=fixture.solver_config,
+        metadata=dict(fixture.metadata),
+    )
 
 
 def _merge_task_database(
@@ -91,6 +135,17 @@ def _parse_tasks(raw: Any) -> list[HumanTask]:
                 project_id=_optional_str(task.get("project_id")),
                 goal_id=_optional_str(task.get("goal_id")),
                 source=_parse_task_source(task.get("source", "task")),
+                split_allowed=_parse_bool(task.get("split_allowed", False)),
+                min_chunk_minutes=(
+                    int(task["min_chunk_minutes"])
+                    if task.get("min_chunk_minutes") is not None
+                    else None
+                ),
+                preferred_chunk_minutes=(
+                    int(task["preferred_chunk_minutes"])
+                    if task.get("preferred_chunk_minutes") is not None
+                    else None
+                ),
                 metadata=_parse_metadata(task.get("metadata", {})),
             )
         )
@@ -117,6 +172,45 @@ def _parse_time_slots(raw: Any) -> list[HumanTimeSlot]:
             )
         )
     return slots
+
+
+def _parse_availability_windows(raw: Any) -> list[HumanAvailabilityWindow]:
+    windows: list[HumanAvailabilityWindow] = []
+    for _window_id, window in _iter_named_items(raw):
+        work_kind = window.get("work_kind", window.get("default_work_kind", "light_work"))
+        windows.append(
+            HumanAvailabilityWindow(
+                start=_parse_time(_required(window, "start")),
+                end=_parse_time(_required(window, "end")),
+                work_kind=_parse_work_kind(work_kind),
+                capacity_minutes=(
+                    int(window["capacity_minutes"])
+                    if window.get("capacity_minutes") is not None
+                    else None
+                ),
+                assigned_project_id=_optional_str(window.get("assigned_project_id")),
+                metadata=_parse_metadata(window.get("metadata", {})),
+            )
+        )
+    return windows
+
+
+def _parse_fixed_events(raw: Any) -> list[HumanFixedEvent]:
+    fixed_events: list[HumanFixedEvent] = []
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        return fixed_events
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        fixed_events.append(
+            HumanFixedEvent(
+                title=str(item.get("title", "fixed event")),
+                start=_parse_time(_required(item, "start")),
+                end=_parse_time(_required(item, "end")),
+                metadata=_parse_metadata(item.get("metadata", {})),
+            )
+        )
+    return fixed_events
 
 
 def _parse_fixed_assignments(raw: Any) -> list[HumanFixedAssignment]:
@@ -182,6 +276,80 @@ def _parse_solver_config(raw: Any) -> HumanDailySolverConfig:
     )
 
 
+def _generate_time_slots(
+    availability_windows: Sequence[HumanAvailabilityWindow],
+    fixed_events: Sequence[HumanFixedEvent],
+    fixture_date: date,
+    now: datetime | None,
+) -> list[HumanTimeSlot]:
+    now_minutes = _now_minutes_for_date(now, fixture_date)
+    segments: list[tuple[int, int, HumanAvailabilityWindow]] = []
+    for window in availability_windows:
+        window_segments = [(_minutes(window.start), _minutes(window.end))]
+        sorted_events = sorted(
+            fixed_events,
+            key=lambda item: (_minutes(item.start), _minutes(item.end)),
+        )
+        for event in sorted_events:
+            window_segments = _subtract_event_segments(window_segments, event)
+        for start_minutes, end_minutes in window_segments:
+            if now_minutes is not None:
+                if end_minutes <= now_minutes:
+                    continue
+                start_minutes = max(start_minutes, now_minutes)
+            if end_minutes > start_minutes:
+                segments.append((start_minutes, end_minutes, window))
+
+    slots: list[HumanTimeSlot] = []
+    for index, (start_minutes, end_minutes, window) in enumerate(
+        sorted(segments, key=lambda item: (item[0], item[1]))
+    ):
+        duration_minutes = end_minutes - start_minutes
+        capacity_minutes = None
+        if window.capacity_minutes is not None:
+            capacity_minutes = min(window.capacity_minutes, duration_minutes)
+        slots.append(
+            HumanTimeSlot(
+                index=index,
+                start=_time_from_minutes(start_minutes),
+                end=_time_from_minutes(end_minutes),
+                work_kind=window.work_kind,
+                capacity_minutes=capacity_minutes,
+                assigned_project_id=window.assigned_project_id,
+                metadata=dict(window.metadata),
+            )
+        )
+    return slots
+
+
+def _subtract_event_segments(
+    segments: Sequence[tuple[int, int]],
+    event: HumanFixedEvent,
+) -> list[tuple[int, int]]:
+    event_start = _minutes(event.start)
+    event_end = _minutes(event.end)
+    remaining: list[tuple[int, int]] = []
+    for start_minutes, end_minutes in segments:
+        if event_end <= start_minutes or event_start >= end_minutes:
+            remaining.append((start_minutes, end_minutes))
+            continue
+        if event_start > start_minutes:
+            remaining.append((start_minutes, event_start))
+        if event_end < end_minutes:
+            remaining.append((event_end, end_minutes))
+    return remaining
+
+
+def _now_minutes_for_date(now: datetime | None, fixture_date: date) -> int | None:
+    if now is None:
+        return None
+    if now.date() < fixture_date:
+        return None
+    if now.date() > fixture_date:
+        return 24 * 60
+    return _minutes(now.time())
+
+
 def _iter_named_items(data: Any) -> Iterable[tuple[str, Mapping[str, Any]]]:
     if isinstance(data, Mapping):
         for key, value in data.items():
@@ -215,6 +383,26 @@ def _parse_time(raw: Any) -> time:
     if isinstance(raw, time):
         return raw
     return time.fromisoformat(str(raw))
+
+
+def _parse_bool(raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        value = raw.lower()
+        if value in {"true", "yes", "1"}:
+            return True
+        if value in {"false", "no", "0"}:
+            return False
+    raise ValueError(f"invalid boolean value: {raw}")
+
+
+def _minutes(value: time) -> int:
+    return value.hour * 60 + value.minute
+
+
+def _time_from_minutes(value: int) -> time:
+    return time(hour=value // 60, minute=value % 60)
 
 
 def _parse_work_kind(raw: Any) -> HumanWorkKind:

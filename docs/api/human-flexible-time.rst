@@ -5,6 +5,17 @@ This design records the Phase 3.3 direction for moving the experimental
 ``scheduler.human`` daily planner beyond hand-written ``time_slots`` while
 keeping the existing fixtures and review command stable.
 
+Implementation Status
+---------------------
+
+The v1 adapter accepts flexible fixture YAML with ``availability_windows``,
+``fixed_events``, and optional ``now``. It compiles that input into generated
+``HumanTimeSlot`` values before the existing timeline solver runs. Existing
+fixtures that provide explicit ``time_slots`` keep their previous behavior.
+
+Task split policy fields are parsed and preserved on ``HumanTask``. The solver
+does not yet split one task into multiple scheduled blocks.
+
 Goals
 -----
 

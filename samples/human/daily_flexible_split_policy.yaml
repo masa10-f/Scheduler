@@ -1,0 +1,36 @@
+date: "2025-09-18"
+metadata:
+  name: daily_flexible_split_policy
+  purpose: split policy fields are parsed while v1 keeps one-block scheduling
+
+availability_windows:
+  - start: "09:00"
+    end: "12:00"
+    work_kind: focused_work
+  - start: "13:00"
+    end: "17:00"
+    work_kind: light_work
+
+tasks:
+  - id: scheduler_patch
+    title: Patch flexible scheduler adapter
+    remaining_minutes: 90
+    priority: 1
+    work_kind: focused_work
+    split_allowed: true
+    min_chunk_minutes: 30
+    preferred_chunk_minutes: 60
+  - id: optics_alignment
+    title: Optical alignment reservation prep
+    remaining_minutes: 120
+    priority: 2
+    work_kind: focused_work
+    split_allowed: false
+  - id: followup_notes
+    title: Send follow-up notes
+    remaining_minutes: 30
+    priority: 4
+    work_kind: light_work
+    split_allowed: true
+    min_chunk_minutes: 15
+    preferred_chunk_minutes: 30

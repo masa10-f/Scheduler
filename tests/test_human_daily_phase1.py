@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from scheduler.human import (
+    compile_human_flexible_daily_fixture,
     HumanDailyFixture,
     HumanDailySolverConfig,
     HumanFixedAssignment,
@@ -18,6 +19,7 @@ from scheduler.human import (
     compare_human_daily_solvers,
     format_human_daily_compact,
     format_human_daily_comparison,
+    human_flexible_daily_fixture_from_dict,
     human_daily_fixture_from_dict,
     load_human_daily_fixture,
     load_human_daily_solver_config,
@@ -54,6 +56,248 @@ class HumanDailyFixtureTests(unittest.TestCase):
             fixture.task_dependencies["logic_state_homodyne"],
             ["homodyne_distribution"],
         )
+
+    def test_flexible_fixture_generates_slots_around_fixed_events_and_now(
+        self,
+    ) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "now": "2026-05-20T10:20:00",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                    },
+                    {
+                        "start": "13:00",
+                        "end": "18:00",
+                        "default_work_kind": "light_work",
+                    },
+                ],
+                "fixed_events": [
+                    {
+                        "title": "Team sync",
+                        "start": "11:00",
+                        "end": "11:30",
+                    },
+                    {
+                        "title": "Lab reservation",
+                        "start": "15:00",
+                        "end": "16:30",
+                    },
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                    }
+                ],
+            }
+        )
+
+        slot_windows = [
+            (
+                slot.index,
+                slot.start.strftime("%H:%M"),
+                slot.end.strftime("%H:%M"),
+                slot.work_kind.value,
+            )
+            for slot in fixture.time_slots
+        ]
+
+        self.assertEqual(
+            slot_windows,
+            [
+                (0, "10:20", "11:00", "focused_work"),
+                (1, "11:30", "12:00", "focused_work"),
+                (2, "13:00", "15:00", "light_work"),
+                (3, "16:30", "18:00", "light_work"),
+            ],
+        )
+
+    def test_explicit_time_slots_take_precedence_over_flexible_windows(self) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "18:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "time_slots": [
+                    {
+                        "index": 7,
+                        "start": "14:00",
+                        "end": "15:00",
+                        "work_kind": "study",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(len(fixture.time_slots), 1)
+        self.assertEqual(fixture.time_slots[0].index, 7)
+        self.assertEqual(fixture.time_slots[0].start.strftime("%H:%M"), "14:00")
+        self.assertEqual(fixture.time_slots[0].work_kind, HumanWorkKind.STUDY)
+
+    def test_flexible_fixture_clips_capacity_to_generated_slot_duration(
+        self,
+    ) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                        "capacity_minutes": 180,
+                    },
+                    {
+                        "start": "13:00",
+                        "end": "16:00",
+                        "work_kind": "light_work",
+                        "capacity_minutes": 45,
+                    },
+                ],
+                "fixed_events": [
+                    {
+                        "title": "Morning break",
+                        "start": "10:00",
+                        "end": "11:00",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            [
+                slot.effective_capacity_minutes
+                for slot in fixture.time_slots
+            ],
+            [60, 60, 45],
+        )
+
+    def test_flexible_fixture_keeps_task_split_policy(self) -> None:
+        flexible = human_flexible_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 90,
+                        "work_kind": "focused_work",
+                        "split_allowed": True,
+                        "min_chunk_minutes": 30,
+                        "preferred_chunk_minutes": 60,
+                    }
+                ],
+            }
+        )
+
+        fixture = compile_human_flexible_daily_fixture(flexible)
+
+        self.assertTrue(fixture.tasks[0].split_allowed)
+        self.assertEqual(fixture.tasks[0].min_chunk_minutes, 30)
+        self.assertEqual(fixture.tasks[0].preferred_chunk_minutes, 60)
+
+    def test_flexible_fixture_parses_string_false_split_policy(self) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 90,
+                        "split_allowed": "false",
+                    }
+                ],
+            }
+        )
+
+        self.assertFalse(fixture.tasks[0].split_allowed)
+
+    def test_flexible_fixture_rejects_invalid_split_policy_boolean(self) -> None:
+        with self.assertRaisesRegex(ValueError, "invalid boolean"):
+            human_daily_fixture_from_dict(
+                {
+                    "date": "2026-05-20",
+                    "availability_windows": [
+                        {
+                            "start": "09:00",
+                            "end": "12:00",
+                            "work_kind": "focused_work",
+                        }
+                    ],
+                    "tasks": [
+                        {
+                            "id": "task",
+                            "title": "Task",
+                            "remaining_minutes": 90,
+                            "split_allowed": "sometimes",
+                        }
+                    ],
+                }
+            )
+
+    def test_now_after_fixture_date_drops_generated_slots(self) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "now": "2026-05-21T09:00:00",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(fixture.time_slots, [])
 
 
 class HumanDailySolverComparisonTests(unittest.TestCase):
@@ -622,6 +866,15 @@ class HumanDailyReviewTests(unittest.TestCase):
         self.assertIn("fixtures: 2", output)
         self.assertIn("daily_mixed_energy", output)
         self.assertIn("daily_deadline_pressure", output)
+
+    def test_review_runs_flexible_fixture(self) -> None:
+        output = run_human_daily_review(
+            [SAMPLES_DIR / "daily_flexible_normal.yaml"]
+        )
+
+        self.assertIn("daily_flexible_normal", output)
+        self.assertIn("Timeline", output)
+        self.assertIn("Unscheduled", output)
 
     def test_review_writes_markdown_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
