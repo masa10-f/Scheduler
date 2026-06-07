@@ -1,71 +1,27 @@
-date: "2026-05-20"
+date: "2025-09-18"
+task_database: data/taskagent_common_database.yaml
 metadata:
   name: daily_dependencies
+  purpose: shared TaskAgent database constrained to dependency-heavy FTQC/GKP work
 
 time_slots:
   - index: 0
     start: "09:00"
     end: "10:30"
-    work_kind: focused_work
+    work_kind: light_work
+    assigned_project_id: ftqc_resources
   - index: 1
     start: "11:00"
     end: "12:00"
-    work_kind: light_work
+    work_kind: study
+    assigned_project_id: ftqc_resources
   - index: 2
     start: "13:00"
     end: "15:00"
-    work_kind: focused_work
+    work_kind: light_work
+    assigned_project_id: ftqc_resources
   - index: 3
     start: "15:30"
     end: "17:00"
     work_kind: study
-
-task_dependencies:
-  proof_outline:
-    - paper_review
-  team_update_summary:
-    - proof_outline
-  blocked_experiment_followup:
-    - missing_beam_profile
-
-tasks:
-  - id: paper_review
-    title: Review related theorem notes
-    remaining_minutes: 60
-    priority: 1
-    work_kind: focused_work
-    due_at: "2026-05-20T12:00:00"
-    project_id: theory-research
-    goal_id: paper-draft
-  - id: proof_outline
-    title: Write proof outline
-    remaining_minutes: 90
-    priority: 1
-    work_kind: focused_work
-    due_at: "2026-05-20T17:00:00"
-    project_id: theory-research
-    goal_id: paper-draft
-  - id: team_update_summary
-    title: Summarize research plan for team sync
-    remaining_minutes: 45
-    priority: 2
-    work_kind: light_work
-    due_at: "2026-05-21T12:00:00"
-    project_id: team-management
-    goal_id: communication
-  - id: blocked_experiment_followup
-    title: Follow up on blocked optics run
-    remaining_minutes: 30
-    priority: 2
-    work_kind: light_work
-    due_at: "2026-05-20T17:00:00"
-    project_id: optics-lab
-    goal_id: alignment-run
-  - id: optics_background_reading
-    title: Read optics calibration notes
-    remaining_minutes: 75
-    priority: 4
-    work_kind: study
-    due_at: "2026-05-27T17:00:00"
-    project_id: optics-lab
-    goal_id: calibration
+    assigned_project_id: ftqc_resources

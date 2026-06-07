@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, time
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from scheduler.human import (
@@ -16,23 +20,40 @@ from scheduler.human import (
     format_human_daily_comparison,
     human_daily_fixture_from_dict,
     load_human_daily_fixture,
+    load_human_daily_solver_config,
+    run_human_daily_review,
     solve_human_daily_legacy,
     solve_human_daily_timeline,
+    write_human_daily_review,
 )
 
 
 SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples" / "human"
+REPO_ROOT = SAMPLES_DIR.parents[1]
+EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 class HumanDailyFixtureTests(unittest.TestCase):
     def test_loads_editable_yaml_fixture(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
 
-        self.assertEqual(fixture.date.isoformat(), "2026-05-20")
+        self.assertEqual(fixture.date.isoformat(), "2025-09-18")
         self.assertEqual(fixture.metadata["name"], "daily_basic")
-        self.assertGreaterEqual(len(fixture.tasks), 12)
+        self.assertGreaterEqual(len(fixture.tasks), 20)
         self.assertEqual(fixture.tasks[0].priority, 1)
         self.assertEqual(fixture.time_slots[0].work_kind.value, "focused_work")
+        self.assertIn("stim_erasure_compiler", fixture.task_dependencies)
+
+    def test_loads_tasks_from_relative_task_database(self) -> None:
+        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
+        task_ids = {task.id for task in fixture.tasks}
+
+        self.assertIn("surface_erasure_circuit", task_ids)
+        self.assertIn("logic_state_homodyne", fixture.task_dependencies)
+        self.assertEqual(
+            fixture.task_dependencies["logic_state_homodyne"],
+            ["homodyne_distribution"],
+        )
 
 
 class HumanDailySolverComparisonTests(unittest.TestCase):
@@ -50,8 +71,34 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertGreater(starts_by_slot[0].count("09:00"), 1)
 
     def test_timeline_solver_uses_sequential_starts_inside_slot(self) -> None:
-        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
-        report = compare_human_daily_solvers(fixture).reports["timeline_greedy"]
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="first",
+                    title="First",
+                    remaining_minutes=60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="second",
+                    title="Second",
+                    remaining_minutes=60,
+                    priority=2,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+        report = solve_human_daily_timeline(fixture)
 
         slot_zero_blocks = [
             block for block in report.plan.blocks if block.slot_index == 0
@@ -68,10 +115,10 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         unscheduled = {item.task_id: item.reason for item in report.unscheduled_tasks}
         scheduled_ids = {block.task_id for block in report.plan.blocks}
 
-        self.assertIn("paper_review", scheduled_ids)
-        self.assertIn("proof_outline", scheduled_ids)
+        self.assertIn("surface_erasure_circuit", scheduled_ids)
+        self.assertIn("stim_erasure_compiler", scheduled_ids)
         self.assertEqual(
-            unscheduled["blocked_experiment_followup"], "dependency_not_scheduled"
+            unscheduled["mid_ir_sync_design"], "dependency_not_scheduled"
         )
 
     def test_timeline_solver_waits_for_prerequisite_finish_time(self) -> None:
@@ -560,6 +607,156 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertIn("Use --verbose", output)
         self.assertNotIn("score breakdown:", output)
         self.assertNotIn("solver settings:", output)
+
+
+class HumanDailyReviewTests(unittest.TestCase):
+    def test_review_runs_multiple_fixtures_in_one_output(self) -> None:
+        output = run_human_daily_review(
+            [
+                SAMPLES_DIR / "daily_mixed_energy.yaml",
+                SAMPLES_DIR / "daily_deadline_pressure.yaml",
+            ]
+        )
+
+        self.assertIn("Human daily review", output)
+        self.assertIn("fixtures: 2", output)
+        self.assertIn("daily_mixed_energy", output)
+        self.assertIn("daily_deadline_pressure", output)
+
+    def test_review_writes_markdown_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "review.md"
+
+            rendered = write_human_daily_review(
+                [SAMPLES_DIR / "daily_mixed_energy.yaml"],
+                output_path,
+                output_format="markdown",
+            )
+
+            self.assertEqual(output_path.read_text(encoding="utf-8"), rendered)
+            self.assertIn("# Human Daily Review", rendered)
+            self.assertIn("```text", rendered)
+            self.assertIn("daily_mixed_energy", rendered)
+
+    def test_review_applies_yaml_solver_config_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "fixture.yaml"
+            config_path = Path(directory) / "config.yaml"
+            fixture_path.write_text(
+                "\n".join(
+                    [
+                        'date: "2026-05-20"',
+                        "metadata:",
+                        "  name: override_fixture",
+                        "time_slots:",
+                        "  - index: 0",
+                        '    start: "09:00"',
+                        '    end: "10:00"',
+                        "    work_kind: focused_work",
+                        "tasks:",
+                        "  - id: focused_task",
+                        "    title: Focused task",
+                        "    remaining_minutes: 30",
+                        "    priority: 1",
+                        "    work_kind: focused_work",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "solver_config:",
+                        "  kind_match_score: 20",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            config = load_human_daily_solver_config(config_path)
+
+            default_output = run_human_daily_review([fixture_path])
+            override_output = run_human_daily_review(
+                [fixture_path],
+                config_override=config,
+            )
+
+            self.assertEqual(config.kind_match_score, 20)
+            self.assertIn("override_fixture", override_output)
+            self.assertNotEqual(default_output, override_output)
+
+    def test_review_cli_writes_markdown_with_config_override(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "review.md"
+            default_output_path = Path(directory) / "default-review.md"
+            config_path = Path(directory) / "config.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "solver_config:",
+                        "  kind_match_score: 20",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            existing_pythonpath = env.get("PYTHONPATH")
+            env["PYTHONPATH"] = (
+                str(REPO_ROOT)
+                if not existing_pythonpath
+                else str(REPO_ROOT) + os.pathsep + existing_pythonpath
+            )
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(EXAMPLES_DIR / "human_daily_review.py"),
+                    str(SAMPLES_DIR / "daily_mixed_energy.yaml"),
+                    "--format",
+                    "markdown",
+                    "--output",
+                    str(default_output_path),
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EXAMPLES_DIR / "human_daily_review.py"),
+                    str(SAMPLES_DIR / "daily_mixed_energy.yaml"),
+                    "--format",
+                    "markdown",
+                    "--config",
+                    str(config_path),
+                    "--output",
+                    str(output_path),
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+
+            rendered = output_path.read_text(encoding="utf-8")
+            self.assertEqual(result.stdout, "")
+            self.assertIn("# Human Daily Review", rendered)
+            self.assertIn("daily_mixed_energy", rendered)
+            self.assertIn("solver: `timeline_greedy`", rendered)
+            self.assertNotEqual(
+                default_output_path.read_text(encoding="utf-8"),
+                rendered,
+            )
+
+    def test_review_requires_at_least_one_fixture(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least one fixture"):
+            run_human_daily_review([])
 
 
 if __name__ == "__main__":

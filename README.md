@@ -11,6 +11,28 @@ Use this layer for adapter-facing concepts such as human tasks, daily time
 slots, fixed assignments, and timeline blocks. The models intentionally do not
 depend on HumanCompiler database types.
 
+Run one fixture:
+
+```bash
+uv run python examples/human_daily_demo.py samples/human/daily_basic.yaml
+```
+
+Run a batch review and save a snapshot:
+
+```bash
+uv run python examples/human_daily_review.py samples/human/*.yaml --format markdown --output human_daily_review.md
+```
+
+The sample review fixtures share the same curated TaskAgent task database at
+`samples/human/data/taskagent_common_database.yaml`. The fixture files vary the
+available time windows and constraints, not the underlying task set.
+
+Apply a shared solver config override to every fixture in the review:
+
+```bash
+uv run python examples/human_daily_review.py samples/human/*.yaml --config review_config.yaml
+```
+
 ## Documentation
 
 Sphinx documentation lives in `docs/`.

@@ -1,0 +1,176 @@
+metadata:
+  name: taskagent_common_database
+  source: taskagent_data_export_2026-05-24.json
+  note: >
+    Curated from production TaskAgent data. Titles, priorities, work kinds, and
+    dependency shapes are preserved where useful; some estimates and work kinds
+    are adjusted so the fixtures produce readable daily scheduling reviews.
+
+task_dependencies:
+  stim_erasure_compiler:
+    - surface_erasure_circuit
+  mbqc_erasure_logical_rate:
+    - stim_erasure_compiler
+  mid_ir_sync_design:
+    - optics_build
+    - camera_selection
+  visibility_qpi_eval:
+    - optics_build
+  odt_check:
+    - visibility_qpi_eval
+  mipodt_check:
+    - odt_check
+  psf_analysis:
+    - bead_odt_data
+  logic_state_homodyne:
+    - homodyne_distribution
+
+tasks:
+  - id: fault_distance_edges
+    title: Implement fault-distance edge ordering
+    remaining_minutes: 90
+    priority: 1
+    work_kind: light_work
+    project_id: ftqc_resources
+    goal_id: small_circuit_performance
+  - id: surface_erasure_circuit
+    title: Study surface-code erasure errors in circuits
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-06T17:00:00"
+    project_id: ftqc_resources
+    goal_id: erasure_error_simulation
+  - id: stim_erasure_compiler
+    title: Add erasure-error support to the Stim compiler
+    remaining_minutes: 90
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-19T17:00:00"
+    project_id: ftqc_resources
+    goal_id: erasure_error_simulation
+  - id: mbqc_erasure_logical_rate
+    title: Evaluate MBQC logical error rates with erasures
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-19T17:00:00"
+    project_id: ftqc_resources
+    goal_id: erasure_error_simulation
+  - id: camera_selection
+    title: Select a camera for video-rate MIP-ODT
+    remaining_minutes: 150
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-20T17:00:00"
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
+  - id: optics_build
+    title: Build the optical setup
+    remaining_minutes: 150
+    priority: 2
+    work_kind: focused_work
+    due_at: "2025-09-27T17:00:00"
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
+  - id: mid_ir_sync_design
+    title: Design synchronization including mid-infrared pulses
+    remaining_minutes: 120
+    priority: 4
+    work_kind: light_work
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
+  - id: bead_odt_data
+    title: Capture 300 nm bead ODT data
+    remaining_minutes: 150
+    priority: 3
+    work_kind: focused_work
+    due_at: "2025-10-31T17:00:00"
+    project_id: video_rate_mip_odt
+    goal_id: bead_resolution_eval
+  - id: psf_analysis
+    title: Analyze the PSF from bead data
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-10-31T17:00:00"
+    project_id: video_rate_mip_odt
+    goal_id: bead_resolution_eval
+  - id: appendix_review
+    title: Review the paper appendix
+    remaining_minutes: 120
+    priority: 2
+    work_kind: focused_work
+    due_at: "2026-04-19T17:00:00"
+    project_id: graph_qomb
+    goal_id: paper_writing
+  - id: rhgblock_design
+    title: Design the RHGBlock abstraction
+    remaining_minutes: 120
+    priority: 2
+    work_kind: light_work
+    project_id: ftqc_resources
+    goal_id: large_refactor
+  - id: tutorial_writing
+    title: Write the package tutorial
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    project_id: graph_qomb
+    goal_id: pypi_release
+  - id: gkp_simulator_prototype
+    title: Build a GKP simulator prototype
+    remaining_minutes: 100
+    priority: 3
+    work_kind: light_work
+    project_id: ftqc_resources
+    goal_id: gkp_simulation_backend
+  - id: homodyne_distribution
+    title: Derive homodyne distributions for general covariance matrices
+    remaining_minutes: 60
+    priority: 3
+    work_kind: study
+    project_id: ftqc_resources
+    goal_id: gkp_simulation_backend
+  - id: logic_state_homodyne
+    title: Derive homodyne distributions for stabilizer logical states
+    remaining_minutes: 30
+    priority: 3
+    work_kind: study
+    project_id: ftqc_resources
+    goal_id: gkp_simulation_backend
+  - id: srs_apod_reading
+    title: Read Super-resolution SRS microscopy with A-PoD
+    remaining_minutes: 90
+    priority: 5
+    work_kind: study
+    project_id: tunable_mip_odt
+    goal_id: lipid_imaging_literature
+  - id: dmd_trigger_check
+    title: Verify DMD behavior with trigger input
+    remaining_minutes: 120
+    priority: 4
+    work_kind: light_work
+    project_id: tunable_mip_odt
+    goal_id: dmd_dynamic_aperture
+  - id: visibility_qpi_eval
+    title: Evaluate visibility and QPI quality
+    remaining_minutes: 90
+    priority: 3
+    work_kind: light_work
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
+  - id: odt_check
+    title: Check the ODT reconstruction
+    remaining_minutes: 120
+    priority: 3
+    work_kind: focused_work
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
+  - id: mipodt_check
+    title: Check the MIP-ODT reconstruction
+    remaining_minutes: 60
+    priority: 3
+    work_kind: focused_work
+    project_id: video_rate_mip_odt
+    goal_id: dmd_video_rate_mip_odt
