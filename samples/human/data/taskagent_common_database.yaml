@@ -27,14 +27,14 @@ task_dependencies:
 
 tasks:
   - id: fault_distance_edges
-    title: Fault distanceを確保するエッジの順番の実装
+    title: Implement fault-distance edge ordering
     remaining_minutes: 90
     priority: 1
     work_kind: light_work
     project_id: ftqc_resources
     goal_id: small_circuit_performance
   - id: surface_erasure_circuit
-    title: circuitにおけるSurface codeのerasure error
+    title: Study surface-code erasure errors in circuits
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
@@ -42,7 +42,7 @@ tasks:
     project_id: ftqc_resources
     goal_id: erasure_error_simulation
   - id: stim_erasure_compiler
-    title: stim compilerにerasure errorを取り込めるよう書き換え
+    title: Add erasure-error support to the Stim compiler
     remaining_minutes: 90
     priority: 3
     work_kind: light_work
@@ -50,7 +50,7 @@ tasks:
     project_id: ftqc_resources
     goal_id: erasure_error_simulation
   - id: mbqc_erasure_logical_rate
-    title: MBQCでerasure error込みの論理エラーレート評価
+    title: Evaluate MBQC logical error rates with erasures
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
@@ -58,7 +58,7 @@ tasks:
     project_id: ftqc_resources
     goal_id: erasure_error_simulation
   - id: camera_selection
-    title: カメラの選定
+    title: Select a camera for video-rate MIP-ODT
     remaining_minutes: 150
     priority: 3
     work_kind: light_work
@@ -66,7 +66,7 @@ tasks:
     project_id: video_rate_mip_odt
     goal_id: dmd_video_rate_mip_odt
   - id: optics_build
-    title: 光学系構築
+    title: Build the optical setup
     remaining_minutes: 150
     priority: 2
     work_kind: focused_work
@@ -74,14 +74,14 @@ tasks:
     project_id: video_rate_mip_odt
     goal_id: dmd_video_rate_mip_odt
   - id: mid_ir_sync_design
-    title: 中赤外を含めた同期の設計
+    title: Design synchronization including mid-infrared pulses
     remaining_minutes: 120
     priority: 4
     work_kind: light_work
     project_id: video_rate_mip_odt
     goal_id: dmd_video_rate_mip_odt
   - id: bead_odt_data
-    title: 300 nmのビーズODTデータ撮影
+    title: Capture 300 nm bead ODT data
     remaining_minutes: 150
     priority: 3
     work_kind: focused_work
@@ -89,7 +89,7 @@ tasks:
     project_id: video_rate_mip_odt
     goal_id: bead_resolution_eval
   - id: psf_analysis
-    title: PSF解析
+    title: Analyze the PSF from bead data
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
@@ -97,7 +97,7 @@ tasks:
     project_id: video_rate_mip_odt
     goal_id: bead_resolution_eval
   - id: appendix_review
-    title: Appendixのレビュー
+    title: Review the paper appendix
     remaining_minutes: 120
     priority: 2
     work_kind: focused_work
@@ -105,70 +105,70 @@ tasks:
     project_id: graph_qomb
     goal_id: paper_writing
   - id: rhgblock_design
-    title: RHGBlockの設計
+    title: Design the RHGBlock abstraction
     remaining_minutes: 120
     priority: 2
     work_kind: light_work
     project_id: ftqc_resources
     goal_id: large_refactor
   - id: tutorial_writing
-    title: tutorialの記述
+    title: Write the package tutorial
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
     project_id: graph_qomb
     goal_id: pypi_release
   - id: gkp_simulator_prototype
-    title: GKP simulatorプロトタイプの作成
+    title: Build a GKP simulator prototype
     remaining_minutes: 100
     priority: 3
     work_kind: light_work
     project_id: ftqc_resources
     goal_id: gkp_simulation_backend
   - id: homodyne_distribution
-    title: 一般の共分散行列に対するホモダイン測定の確率分布の導出
+    title: Derive homodyne distributions for general covariance matrices
     remaining_minutes: 60
     priority: 3
     work_kind: study
     project_id: ftqc_resources
     goal_id: gkp_simulation_backend
   - id: logic_state_homodyne
-    title: 論理状態がスタビライザーの時のホモダイン測定の確率分布
+    title: Derive homodyne distributions for stabilizer logical states
     remaining_minutes: 30
     priority: 3
     work_kind: study
     project_id: ftqc_resources
     goal_id: gkp_simulation_backend
   - id: srs_apod_reading
-    title: Super-resolution SRS microscopy with A-PoDを読む
+    title: Read Super-resolution SRS microscopy with A-PoD
     remaining_minutes: 90
     priority: 5
     work_kind: study
     project_id: tunable_mip_odt
     goal_id: lipid_imaging_literature
   - id: dmd_trigger_check
-    title: トリガーを入れた際のDMDの動作確認
+    title: Verify DMD behavior with trigger input
     remaining_minutes: 120
     priority: 4
     work_kind: light_work
     project_id: tunable_mip_odt
     goal_id: dmd_dynamic_aperture
   - id: visibility_qpi_eval
-    title: visibility, qpiの評価
+    title: Evaluate visibility and QPI quality
     remaining_minutes: 90
     priority: 3
     work_kind: light_work
     project_id: video_rate_mip_odt
     goal_id: dmd_video_rate_mip_odt
   - id: odt_check
-    title: ODTの確認
+    title: Check the ODT reconstruction
     remaining_minutes: 120
     priority: 3
     work_kind: focused_work
     project_id: video_rate_mip_odt
     goal_id: dmd_video_rate_mip_odt
   - id: mipodt_check
-    title: MIPODTの確認
+    title: Check the MIP-ODT reconstruction
     remaining_minutes: 60
     priority: 3
     work_kind: focused_work
