@@ -236,6 +236,62 @@ class HumanDailyFixtureTests(unittest.TestCase):
             [60, 30],
         )
 
+    def test_rolling_flexible_fixture_preserves_future_slot_indexes(self) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "now": "2026-05-20T10:30:00",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "fixed_events": [
+                    {
+                        "title": "Meeting",
+                        "start": "10:00",
+                        "end": "11:00",
+                    }
+                ],
+                "fixed_assignments": [
+                    {
+                        "task_id": "fixed_task",
+                        "slot_index": 1,
+                        "duration_minutes": 30,
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "fixed_task",
+                        "title": "Fixed future task",
+                        "remaining_minutes": 30,
+                        "work_kind": "focused_work",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            [
+                (
+                    slot.index,
+                    slot.start.strftime("%H:%M"),
+                    slot.end.strftime("%H:%M"),
+                )
+                for slot in fixture.time_slots
+            ],
+            [(1, "11:00", "12:00")],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(report.violations, [])
+        self.assertEqual(report.plan.blocks[0].task_id, "fixed_task")
+        self.assertEqual(report.plan.blocks[0].slot_index, 1)
+
     def test_flexible_fixture_keeps_task_split_policy(self) -> None:
         flexible = human_flexible_daily_fixture_from_dict(
             {

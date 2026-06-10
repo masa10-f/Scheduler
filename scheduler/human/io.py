@@ -283,9 +283,8 @@ def _generate_time_slots(
     now: datetime | None,
 ) -> list[HumanTimeSlot]:
     now_minutes = _now_minutes_for_date(now, fixture_date)
-    segments: list[tuple[int, int, HumanAvailabilityWindow, int | None]] = []
-    for window in availability_windows:
-        remaining_capacity = window.capacity_minutes
+    raw_segments: list[tuple[int, int, int, HumanAvailabilityWindow]] = []
+    for window_index, window in enumerate(availability_windows):
         window_segments = [(_minutes(window.start), _minutes(window.end))]
         sorted_events = sorted(
             fixed_events,
@@ -294,24 +293,38 @@ def _generate_time_slots(
         for event in sorted_events:
             window_segments = _subtract_event_segments(window_segments, event)
         for start_minutes, end_minutes in window_segments:
-            if now_minutes is not None:
-                if end_minutes <= now_minutes:
-                    continue
-                start_minutes = max(start_minutes, now_minutes)
             if end_minutes > start_minutes:
-                duration_minutes = end_minutes - start_minutes
-                capacity_minutes = None
-                if remaining_capacity is not None:
-                    capacity_minutes = min(remaining_capacity, duration_minutes)
-                    remaining_capacity -= capacity_minutes
-                segments.append(
-                    (start_minutes, end_minutes, window, capacity_minutes)
+                raw_segments.append(
+                    (start_minutes, end_minutes, window_index, window)
                 )
 
     slots: list[HumanTimeSlot] = []
-    for index, (start_minutes, end_minutes, window, capacity_minutes) in enumerate(
-        sorted(segments, key=lambda item: (item[0], item[1]))
+    remaining_capacity_by_window = {
+        window_index: window.capacity_minutes
+        for window_index, window in enumerate(availability_windows)
+    }
+    sorted_segments = sorted(
+        raw_segments,
+        key=lambda item: (item[0], item[1], item[2]),
+    )
+    for index, (start_minutes, end_minutes, window_index, window) in enumerate(
+        sorted_segments
     ):
+        if now_minutes is not None:
+            if end_minutes <= now_minutes:
+                continue
+            start_minutes = max(start_minutes, now_minutes)
+        if end_minutes <= start_minutes:
+            continue
+        duration_minutes = end_minutes - start_minutes
+        capacity_minutes = None
+        remaining_capacity = remaining_capacity_by_window[window_index]
+        if remaining_capacity is not None:
+            assigned_capacity = min(remaining_capacity, duration_minutes)
+            capacity_minutes = assigned_capacity
+            remaining_capacity_by_window[window_index] = (
+                remaining_capacity - assigned_capacity
+            )
         slots.append(
             HumanTimeSlot(
                 index=index,
