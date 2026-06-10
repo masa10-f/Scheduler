@@ -15,6 +15,7 @@ The v1 adapter is implemented. It:
 * subtracts ``fixed_events`` from ``availability_windows``;
 * drops generated intervals that end before ``now``;
 * trims generated intervals that cross ``now`` to start at ``now``;
+* preserves generated slot indexes when rolling ``now`` drops past slots;
 * distributes a capped window's ``capacity_minutes`` across generated slots;
 * preserves ``task_dependencies`` and ``solver_config``;
 * keeps existing fixtures with explicit ``time_slots`` unchanged.
@@ -70,7 +71,8 @@ Input Model
   Optional timestamp for rolling reschedule. Generated intervals ending before
   ``now`` are dropped, and intervals crossing ``now`` are trimmed to begin at
   ``now``. The v1 adapter does not reconstruct already scheduled historical
-  blocks.
+  blocks. Slot indexes are assigned before ``now`` filtering, so rolling
+  fixtures can contain index gaps when past slots are dropped.
 
 ``split_allowed`` and chunk fields
   Task-level split policy. ``split_allowed``, ``min_chunk_minutes``, and
