@@ -283,8 +283,9 @@ def _generate_time_slots(
     now: datetime | None,
 ) -> list[HumanTimeSlot]:
     now_minutes = _now_minutes_for_date(now, fixture_date)
-    segments: list[tuple[int, int, HumanAvailabilityWindow]] = []
+    segments: list[tuple[int, int, HumanAvailabilityWindow, int | None]] = []
     for window in availability_windows:
+        remaining_capacity = window.capacity_minutes
         window_segments = [(_minutes(window.start), _minutes(window.end))]
         sorted_events = sorted(
             fixed_events,
@@ -298,16 +299,19 @@ def _generate_time_slots(
                     continue
                 start_minutes = max(start_minutes, now_minutes)
             if end_minutes > start_minutes:
-                segments.append((start_minutes, end_minutes, window))
+                duration_minutes = end_minutes - start_minutes
+                capacity_minutes = None
+                if remaining_capacity is not None:
+                    capacity_minutes = min(remaining_capacity, duration_minutes)
+                    remaining_capacity -= capacity_minutes
+                segments.append(
+                    (start_minutes, end_minutes, window, capacity_minutes)
+                )
 
     slots: list[HumanTimeSlot] = []
-    for index, (start_minutes, end_minutes, window) in enumerate(
+    for index, (start_minutes, end_minutes, window, capacity_minutes) in enumerate(
         sorted(segments, key=lambda item: (item[0], item[1]))
     ):
-        duration_minutes = end_minutes - start_minutes
-        capacity_minutes = None
-        if window.capacity_minutes is not None:
-            capacity_minutes = min(window.capacity_minutes, duration_minutes)
         slots.append(
             HumanTimeSlot(
                 index=index,

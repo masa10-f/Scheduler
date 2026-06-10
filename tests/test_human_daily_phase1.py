@@ -197,6 +197,45 @@ class HumanDailyFixtureTests(unittest.TestCase):
             [60, 60, 45],
         )
 
+    def test_flexible_fixture_distributes_window_capacity_across_split_slots(
+        self,
+    ) -> None:
+        fixture = human_daily_fixture_from_dict(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "12:00",
+                        "work_kind": "focused_work",
+                        "capacity_minutes": 90,
+                    }
+                ],
+                "fixed_events": [
+                    {
+                        "title": "Meeting",
+                        "start": "10:00",
+                        "end": "11:00",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Task",
+                        "remaining_minutes": 30,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            [
+                slot.effective_capacity_minutes
+                for slot in fixture.time_slots
+            ],
+            [60, 30],
+        )
+
     def test_flexible_fixture_keeps_task_split_policy(self) -> None:
         flexible = human_flexible_daily_fixture_from_dict(
             {
