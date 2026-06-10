@@ -4,7 +4,9 @@ from datetime import time
 import unittest
 
 from scheduler.human import (
+    HumanAvailabilityWindow,
     HumanDailyPlan,
+    HumanFixedEvent,
     HumanFixedAssignment,
     HumanScheduleBlock,
     HumanTask,
@@ -30,6 +32,17 @@ class HumanTaskTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "priority"):
             HumanTask(id="task-1", title="Invalid", remaining_minutes=30, priority=6)
 
+    def test_task_rejects_invalid_split_policy(self) -> None:
+        with self.assertRaisesRegex(ValueError, "preferred_chunk_minutes"):
+            HumanTask(
+                id="task-1",
+                title="Invalid split",
+                remaining_minutes=90,
+                split_allowed=True,
+                min_chunk_minutes=60,
+                preferred_chunk_minutes=30,
+            )
+
 
 class HumanTimeSlotTests(unittest.TestCase):
     def test_slot_reports_same_day_duration_and_capacity(self) -> None:
@@ -51,6 +64,18 @@ class HumanTimeSlotTests(unittest.TestCase):
     def test_slot_rejects_reversed_window(self) -> None:
         with self.assertRaisesRegex(ValueError, "end"):
             HumanTimeSlot(index=0, start=time(12, 0), end=time(9, 0))
+
+
+class HumanAvailabilityWindowTests(unittest.TestCase):
+    def test_availability_window_rejects_reversed_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "end"):
+            HumanAvailabilityWindow(start=time(12, 0), end=time(9, 0))
+
+
+class HumanFixedEventTests(unittest.TestCase):
+    def test_fixed_event_rejects_reversed_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "end"):
+            HumanFixedEvent(title="Meeting", start=time(12, 0), end=time(9, 0))
 
 
 class HumanPlanTests(unittest.TestCase):

@@ -1,0 +1,20 @@
+date: "2025-09-18"
+now: "2025-09-18T10:20:00"
+task_database: data/taskagent_common_database.yaml
+metadata:
+  name: daily_flexible_rolling
+  purpose: rolling reschedule trims past availability
+
+availability_windows:
+  - start: "09:00"
+    end: "12:00"
+    work_kind: focused_work
+  - start: "13:00"
+    end: "17:30"
+    work_kind: study
+
+fixed_events:
+  - title: Team sync
+    start: "11:00"
+    end: "11:30"
+

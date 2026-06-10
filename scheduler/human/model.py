@@ -34,6 +34,9 @@ class HumanTask:
     project_id: str | None = None
     goal_id: str | None = None
     source: HumanTaskSource = "task"
+    split_allowed: bool = False
+    min_chunk_minutes: int | None = None
+    preferred_chunk_minutes: int | None = None
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -41,6 +44,53 @@ class HumanTask:
             raise ValueError("remaining_minutes must be non-negative")
         if not 1 <= self.priority <= 5:
             raise ValueError("priority must be between 1 and 5")
+        if self.min_chunk_minutes is not None and self.min_chunk_minutes <= 0:
+            raise ValueError("min_chunk_minutes must be positive")
+        if (
+            self.preferred_chunk_minutes is not None
+            and self.preferred_chunk_minutes <= 0
+        ):
+            raise ValueError("preferred_chunk_minutes must be positive")
+        if (
+            self.min_chunk_minutes is not None
+            and self.preferred_chunk_minutes is not None
+            and self.preferred_chunk_minutes < self.min_chunk_minutes
+        ):
+            raise ValueError(
+                "preferred_chunk_minutes must be at least min_chunk_minutes"
+            )
+
+
+@dataclass(frozen=True)
+class HumanAvailabilityWindow:
+    """Broad same-day work availability before fixed events are subtracted."""
+
+    start: time
+    end: time
+    work_kind: HumanWorkKind = HumanWorkKind.LIGHT_WORK
+    capacity_minutes: int | None = None
+    assigned_project_id: str | None = None
+    metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.end <= self.start:
+            raise ValueError("end must be later than start")
+        if self.capacity_minutes is not None and self.capacity_minutes < 0:
+            raise ValueError("capacity_minutes must be non-negative")
+
+
+@dataclass(frozen=True)
+class HumanFixedEvent:
+    """Hard same-day block that removes availability from generated slots."""
+
+    title: str
+    start: time
+    end: time
+    metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.end <= self.start:
+            raise ValueError("end must be later than start")
 
 
 @dataclass(frozen=True)
@@ -189,6 +239,23 @@ class HumanDailyFixture:
     date: date
     tasks: list[HumanTask]
     time_slots: list[HumanTimeSlot]
+    fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
+    task_dependencies: dict[str, list[str]] = field(default_factory=dict)
+    solver_config: HumanDailySolverConfig = field(
+        default_factory=HumanDailySolverConfig
+    )
+    metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class HumanFlexibleDailyFixture:
+    """Flexible daily input that can compile into HumanDailyFixture."""
+
+    date: date
+    tasks: list[HumanTask]
+    availability_windows: list[HumanAvailabilityWindow]
+    fixed_events: list[HumanFixedEvent] = field(default_factory=list)
+    now: datetime | None = None
     fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
     task_dependencies: dict[str, list[str]] = field(default_factory=dict)
     solver_config: HumanDailySolverConfig = field(

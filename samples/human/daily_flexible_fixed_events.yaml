@@ -1,0 +1,19 @@
+date: "2025-09-18"
+task_database: data/taskagent_common_database.yaml
+metadata:
+  name: daily_flexible_fixed_events
+  purpose: lab reservation splits a broad afternoon window
+
+availability_windows:
+  - start: "08:30"
+    end: "12:00"
+    work_kind: focused_work
+  - start: "13:00"
+    end: "18:00"
+    work_kind: light_work
+
+fixed_events:
+  - title: Optical table reservation
+    start: "15:00"
+    end: "16:30"
+

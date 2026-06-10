@@ -1,10 +1,13 @@
 """Experimental HumanCompiler scheduling domain API."""
 
 from .model import (
+    HumanAvailabilityWindow,
     HumanConstraintViolation,
     HumanDailyFixture,
     HumanDailyPlan,
     HumanDailySolverConfig,
+    HumanFixedEvent,
+    HumanFlexibleDailyFixture,
     HumanFixedAssignment,
     HumanScheduleBlock,
     HumanScoreBreakdown,
@@ -17,7 +20,9 @@ from .model import (
     HumanWorkKind,
 )
 from .io import (
+    compile_human_flexible_daily_fixture,
     human_daily_fixture_from_dict,
+    human_flexible_daily_fixture_from_dict,
     human_daily_solver_config_from_dict,
     load_human_daily_fixture,
     load_human_daily_solver_config,
@@ -40,10 +45,13 @@ from .solver import (
 )
 
 __all__ = [
+    "HumanAvailabilityWindow",
     "HumanConstraintViolation",
     "HumanDailyFixture",
     "HumanDailyPlan",
     "HumanDailySolverConfig",
+    "HumanFixedEvent",
+    "HumanFlexibleDailyFixture",
     "HumanFixedAssignment",
     "HumanScheduleBlock",
     "HumanScoreBreakdown",
@@ -55,12 +63,14 @@ __all__ = [
     "HumanUnscheduledTask",
     "HumanWorkKind",
     "compare_human_daily_solvers",
+    "compile_human_flexible_daily_fixture",
     "format_human_daily_compact",
     "format_human_daily_comparison",
     "format_human_daily_report",
     "format_human_daily_review_markdown",
     "format_human_daily_review_text",
     "human_daily_fixture_from_dict",
+    "human_flexible_daily_fixture_from_dict",
     "human_daily_solver_config_from_dict",
     "load_human_daily_fixture",
     "load_human_daily_solver_config",
