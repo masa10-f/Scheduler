@@ -3,14 +3,19 @@ name = "taskagent-scheduler"
 version = "0.1.0"
 description = "A general purpose scheduling solver"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10, <3.15"
 dependencies = [
   "pyyaml>=6.0",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=7.4",
+  "mypy==2.1.0",
+  "pre-commit==4.6.0",
+  "pyright==1.1.410",
+  "pytest==9.0.3",
+  "pytest-cov==7.1.0",
+  "ruff==0.15.16",
 ]
 
 [project.optional-dependencies]
@@ -23,3 +28,162 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["scheduler"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = [
+  # Conflicts with ruff format
+  "COM812",
+  "COM819",
+  "D206",
+  "D300",
+  "E111",
+  "E114",
+  "E117",
+  "ISC001",
+  "ISC002",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "W191",
+
+  # Not necessary for this project
+  "AIR",
+  "ASYNC",
+  "DJ",
+  "PD",
+
+  # Manually disabled
+  "CPY",     # copyright missing
+  "D105",    # undocumented magic method
+  "DOC201",  # return sections for existing concise docstrings
+  "DOC501",  # raised exception sections for existing concise docstrings
+  "EM101",   # exception message style migration is deferred
+  "EM102",   # exception message style migration is deferred
+  "ERA",     # commented-out code
+  "FBT",     # boolean-trap
+  "FIX",     # fixme
+  "PLR0904", # too-many-public-methods
+  "TC001",   # typing-only app imports add churn for runtime re-export modules
+  "TC003",   # typing-only stdlib imports add churn for dataclass-heavy modules
+  "TRY003",  # custom exception classes are not worth the churn here
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*.py" = [
+  "D",
+  "T201", # print
+]
+"scheduler/human/io.py" = [
+  "ANN401", # YAML payloads are validated at the boundary
+  "PLR2004",
+]
+"scheduler/io.py" = [
+  "ANN401", # YAML payloads are validated at the boundary
+  "PLR2004",
+]
+"scheduler/human/model.py" = [
+  "C901",
+  "D102",
+  "PLR0912",
+  "PLR2004",
+]
+"scheduler/human/report.py" = [
+  "C901",
+  "D100",
+  "D103",
+  "FURB113",
+  "PERF401",
+  "PLR0912",
+  "PLR2004",
+]
+"scheduler/human/review.py" = [
+  "D100",
+  "D103",
+]
+"scheduler/human/solver.py" = [
+  "D100",
+  "D103",
+  "PLR0913",
+  "PLR0917",
+  "PLR6104",
+  "SIM103",
+]
+"scheduler/solvers.py" = [
+  "ANN401", # optional OR-Tools API is imported dynamically
+  "C901",
+  "PLR0912",
+  "PLR0913",
+  "PLR0914",
+  "PLR0915",
+  "PLR0917",
+]
+"tests/*.py" = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D400",
+  "D417",
+  "FLY002",
+  "PLR2004",
+  "PT009",
+  "PT027",
+  "S101",
+  "S404",
+  "S603",
+  "SLF001",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "cp_sat: tests requiring the optional OR-Tools CP-SAT dependency",
+]
+
+[tool.coverage.run]
+source = ["scheduler"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  'raise NotImplementedError\(.*\)',
+  "return NotImplemented",
+  "@abc.abstractmethod",
+]
+fail_under = 50
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+files = ["scheduler", "tests", "examples"]
+
+[tool.pyright]
+include = ["scheduler", "tests", "examples"]
+reportMissingImports = "information"
+reportUnknownArgumentType = "information"
+reportUnknownLambdaType = "information"
+reportUnknownMemberType = "information"
+reportUnknownParameterType = "information"
+reportUnknownVariableType = "information"

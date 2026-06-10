@@ -10,9 +10,7 @@ from .model import (
 )
 
 
-def format_human_daily_compact(
-    comparison: HumanSolverComparison, *, solver_name: str = "timeline_greedy"
-) -> str:
+def format_human_daily_compact(comparison: HumanSolverComparison, *, solver_name: str = "timeline_greedy") -> str:
     report = comparison.reports[solver_name]
     fixture = comparison.fixture
     fixture_name = fixture.metadata.get("name", "unnamed")
@@ -46,15 +44,11 @@ def format_human_daily_comparison(comparison: HumanSolverComparison) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def format_human_daily_report(
-    fixture: HumanDailyFixture, report: HumanSolverReport
-) -> str:
+def format_human_daily_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> str:
     return "\n".join(_format_report(fixture, report)).rstrip() + "\n"
 
 
-def _format_compact_timeline(
-    fixture: HumanDailyFixture, report: HumanSolverReport
-) -> list[str]:
+def _format_compact_timeline(fixture: HumanDailyFixture, report: HumanSolverReport) -> list[str]:
     if not report.plan.blocks:
         return ["  none"]
 
@@ -92,9 +86,7 @@ def _format_compact_unscheduled(report: HumanSolverReport) -> list[str]:
     return lines
 
 
-def _format_report(
-    fixture: HumanDailyFixture, report: HumanSolverReport
-) -> list[str]:
+def _format_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> list[str]:
     task_titles = {task.id: task.title for task in fixture.tasks}
     slot_kinds = {slot.index: slot.work_kind.value for slot in fixture.time_slots}
     score_by_task = {score.task_id: score for score in report.score_breakdown}
@@ -123,22 +115,15 @@ def _format_report(
     lines.append("unscheduled:")
     if report.unscheduled_tasks:
         for item in report.unscheduled_tasks:
-            lines.append(
-                f"  - task={item.task_id} title={item.title!r} reason={item.reason}"
-            )
+            lines.append(f"  - task={item.task_id} title={item.title!r} reason={item.reason}")
     else:
         lines.append("  none")
 
     lines.append("score breakdown:")
     if report.score_breakdown:
         for score in report.score_breakdown:
-            components = ", ".join(
-                f"{name}={value}" for name, value in score.components.items()
-            )
-            lines.append(
-                f"  - task={score.task_id} slot={score.slot_index} "
-                f"total={score.total} ({components})"
-            )
+            components = ", ".join(f"{name}={value}" for name, value in score.components.items())
+            lines.append(f"  - task={score.task_id} slot={score.slot_index} total={score.total} ({components})")
     else:
         lines.append("  none")
 

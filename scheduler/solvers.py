@@ -1,8 +1,11 @@
+"""Scheduling solver implementations."""
+
 from __future__ import annotations
 
 import heapq
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib import import_module
 from typing import Any
 
 from scheduler.constraints import (
@@ -16,6 +19,8 @@ from scheduler.model import Assignment, Precedence, Problem, Schedule, Task
 
 @dataclass
 class SolverResult:
+    """Result returned by a scheduling solver."""
+
     schedule: Schedule
     status: str
     violations: list[Violation] = field(default_factory=list)
@@ -24,9 +29,8 @@ class SolverResult:
     metadata: dict[str, object] = field(default_factory=dict)
 
 
-def solve_greedy(
-    problem: Problem, constraints: Iterable[Constraint] | None = None
-) -> SolverResult:
+def solve_greedy(problem: Problem, constraints: Iterable[Constraint] | None = None) -> SolverResult:
+    """Solve a problem with a deterministic greedy heuristic."""
     constraints = list(constraints) if constraints is not None else default_constraints()
     horizon = _compute_time_horizon(problem)
     order, preds_by_task = _topological_order(problem)
@@ -37,9 +41,7 @@ def solve_greedy(
 
     for task_id in order:
         task = problem.tasks[task_id]
-        min_start = _min_start_from_predecessors(
-            problem, schedule, preds_by_task.get(task_id, []), task
-        )
+        min_start = _min_start_from_predecessors(problem, schedule, preds_by_task.get(task_id, []), task)
         if min_start is None:
             unscheduled.append(task_id)
             continue
@@ -85,12 +87,12 @@ def solve_cp_sat(
     constraints: Iterable[Constraint] | None = None,
     time_limit_s: float | None = 5.0,
 ) -> SolverResult:
+    """Solve a problem with the optional OR-Tools CP-SAT backend."""
     try:
-        from ortools.sat.python import cp_model  # type: ignore
+        cp_model: Any = import_module("ortools.sat.python.cp_model")
     except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "OR-Tools is required for CP-SAT. Install with `pip install ortools`."
-        ) from exc
+        message = "OR-Tools is required for CP-SAT. Install with `pip install ortools`."
+        raise ModuleNotFoundError(message) from exc
 
     constraints = list(constraints) if constraints is not None else default_constraints()
     horizon = _compute_time_horizon(problem)
@@ -135,19 +137,19 @@ def solve_cp_sat(
                 metadata={"solver": "cp-sat", "reason": "invalid time window"},
             )
 
-        start = model.NewIntVar(min_start, max_start, f"start_{task_id}")
-        end = model.NewIntVar(min_start + task.duration, max_start + task.duration, f"end_{task_id}")
-        model.Add(end == start + task.duration)
+        start = model.new_int_var(min_start, max_start, f"start_{task_id}")
+        end = model.new_int_var(min_start + task.duration, max_start + task.duration, f"end_{task_id}")
+        model.add(end == start + task.duration)
         start_vars[task_id] = start
         end_vars[task_id] = end
 
         presence_lits: list[Any] = []
         for resource_id in eligible_resources[task_id]:
-            lit = model.NewBoolVar(f"assign_{task_id}_{resource_id}")
-            interval = model.NewOptionalIntervalVar(
+            lit = model.new_bool_var(f"assign_{task_id}_{resource_id}")
+            interval = model.new_optional_interval_var(
                 start, task.duration, end, lit, f"interval_{task_id}_{resource_id}"
             )
-            presence[(task_id, resource_id)] = lit
+            presence[task_id, resource_id] = lit
             presence_lits.append(lit)
             intervals_by_resource[resource_id].append(interval)
             demands_by_resource[resource_id].append(task.resource_demand)
@@ -155,67 +157,63 @@ def solve_cp_sat(
             resource = resources[resource_id]
             if resource.availability is not None:
                 if not resource.availability:
-                    model.Add(lit == 0)
+                    model.add(lit == 0)
                 else:
                     window_lits: list[Any] = []
                     for idx, (win_start, win_end) in enumerate(resource.availability):
-                        wlit = model.NewBoolVar(
-                            f"avail_{task_id}_{resource_id}_{idx}"
-                        )
-                        model.Add(start >= win_start).OnlyEnforceIf(wlit)
-                        model.Add(end <= win_end).OnlyEnforceIf(wlit)
-                        model.AddImplication(wlit, lit)
+                        wlit = model.new_bool_var(f"avail_{task_id}_{resource_id}_{idx}")
+                        model.add(start >= win_start).only_enforce_if(wlit)
+                        model.add(end <= win_end).only_enforce_if(wlit)
+                        model.add_implication(wlit, lit)
                         window_lits.append(wlit)
-                    model.AddBoolOr(window_lits).OnlyEnforceIf(lit)
+                    model.add_bool_or(window_lits).only_enforce_if(lit)
 
-        model.AddExactlyOne(presence_lits)
+        model.add_exactly_one(presence_lits)
 
         if task.latest_end is not None:
-            model.Add(end <= task.latest_end)
+            model.add(end <= task.latest_end)
 
     for prec in problem.precedences:
         if prec.before not in tasks or prec.after not in tasks:
             continue
-        model.Add(start_vars[prec.after] >= end_vars[prec.before] + prec.lag)
+        model.add(start_vars[prec.after] >= end_vars[prec.before] + prec.lag)
 
     for resource_id, intervals in intervals_by_resource.items():
         if not intervals:
             continue
         capacity = resources[resource_id].capacity
-        model.AddCumulative(intervals, demands_by_resource[resource_id], capacity)
+        model.add_cumulative(intervals, demands_by_resource[resource_id], capacity)
 
-    makespan = model.NewIntVar(0, horizon, "makespan")
-    model.AddMaxEquality(makespan, [end_vars[tid] for tid in tasks])
-    model.Minimize(makespan)
+    makespan = model.new_int_var(0, horizon, "makespan")
+    model.add_max_equality(makespan, [end_vars[tid] for tid in tasks])
+    model.minimize(makespan)
 
     solver = cp_model.CpSolver()
     if time_limit_s is not None:
         solver.parameters.max_time_in_seconds = float(time_limit_s)
 
-    status = solver.Solve(model)
-    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    status = solver.solve(model)
+    if status not in {cp_model.OPTIMAL, cp_model.FEASIBLE}:
         return SolverResult(
             schedule=Schedule(),
             status="infeasible",
             violations=[],
             unscheduled=list(tasks.keys()),
             objective=None,
-            metadata={"solver": "cp-sat", "cp_status": solver.StatusName(status)},
+            metadata={"solver": "cp-sat", "cp_status": solver.status_name(status)},
         )
 
     schedule = Schedule()
     for task_id in tasks:
-        start = int(solver.Value(start_vars[task_id]))
+        start = int(solver.value(start_vars[task_id]))
         assigned_resource = None
         for resource_id in eligible_resources[task_id]:
-            if solver.Value(presence[(task_id, resource_id)]) == 1:
+            if solver.value(presence[task_id, resource_id]) == 1:
                 assigned_resource = resource_id
                 break
         if assigned_resource is None:
             continue
-        schedule.assignments[task_id] = Assignment(
-            task_id=task_id, resource_id=assigned_resource, start=start
-        )
+        schedule.assignments[task_id] = Assignment(task_id=task_id, resource_id=assigned_resource, start=start)
 
     violations = evaluate_constraints(problem, schedule, constraints)
     return SolverResult(
@@ -223,8 +221,8 @@ def solve_cp_sat(
         status="ok" if not violations else "violations",
         violations=violations,
         unscheduled=[],
-        objective=int(solver.Value(makespan)),
-        metadata={"solver": "cp-sat", "cp_status": solver.StatusName(status)},
+        objective=int(solver.value(makespan)),
+        metadata={"solver": "cp-sat", "cp_status": solver.status_name(status)},
     )
 
 
@@ -233,11 +231,10 @@ def compare_solvers(
     constraints: Iterable[Constraint] | None = None,
     time_limit_s: float | None = 5.0,
 ) -> dict[str, SolverResult]:
+    """Run all available solvers and return their results by solver name."""
     return {
         "greedy": solve_greedy(problem, constraints=constraints),
-        "cp-sat": solve_cp_sat(
-            problem, constraints=constraints, time_limit_s=time_limit_s
-        ),
+        "cp-sat": solve_cp_sat(problem, constraints=constraints, time_limit_s=time_limit_s),
     }
 
 
@@ -247,7 +244,7 @@ def _task_sort_key(task: Task, task_id: str) -> tuple[int, int, str]:
 
 def _topological_order(problem: Problem) -> tuple[list[str], dict[str, list[Precedence]]]:
     tasks = problem.tasks
-    indegree = {task_id: 0 for task_id in tasks}
+    indegree = dict.fromkeys(tasks, 0)
     adj: dict[str, list[str]] = {task_id: [] for task_id in tasks}
     preds: dict[str, list[Precedence]] = {task_id: [] for task_id in tasks}
 
@@ -372,10 +369,7 @@ def _fits_capacity(
     demand: int,
     capacity: int,
 ) -> bool:
-    for t in range(start, end):
-        if usage.get(t, 0) + demand > capacity:
-            return False
-    return True
+    return all(usage.get(t, 0) + demand <= capacity for t in range(start, end))
 
 
 def _apply_usage(
@@ -409,7 +403,7 @@ def _compute_time_horizon(problem: Problem) -> int:
     earliest_start = min((task.earliest_start for task in problem.tasks.values()), default=0)
     candidates = [value for value in [latest_end, max_avail] if value is not None]
     if candidates:
-        return max(max(candidates), earliest_start + total_duration)
+        return max(*candidates, earliest_start + total_duration)
     return earliest_start + total_duration
 
 

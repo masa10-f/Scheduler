@@ -25,11 +25,7 @@ def main() -> int:
 
     fixture = load_human_daily_fixture(args.path)
     comparison = compare_human_daily_solvers(fixture)
-    formatter = (
-        format_human_daily_comparison
-        if args.verbose
-        else format_human_daily_compact
-    )
+    formatter = format_human_daily_comparison if args.verbose else format_human_daily_compact
     print(formatter(comparison), end="")
     return 0
 

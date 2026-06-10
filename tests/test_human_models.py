@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import time
 import unittest
+from datetime import time
 
 from scheduler.human import (
     HumanAvailabilityWindow,
     HumanDailyPlan,
-    HumanFixedEvent,
     HumanFixedAssignment,
+    HumanFixedEvent,
     HumanScheduleBlock,
     HumanTask,
     HumanTimeSlot,

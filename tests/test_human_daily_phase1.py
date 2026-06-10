@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from datetime import date, time
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date, time
+from pathlib import Path
 
 from scheduler.human import (
-    compile_human_flexible_daily_fixture,
     HumanDailyFixture,
     HumanDailySolverConfig,
     HumanFixedAssignment,
@@ -17,10 +16,11 @@ from scheduler.human import (
     HumanTimeSlot,
     HumanWorkKind,
     compare_human_daily_solvers,
+    compile_human_flexible_daily_fixture,
     format_human_daily_compact,
     format_human_daily_comparison,
-    human_flexible_daily_fixture_from_dict,
     human_daily_fixture_from_dict,
+    human_flexible_daily_fixture_from_dict,
     load_human_daily_fixture,
     load_human_daily_solver_config,
     run_human_daily_review,
@@ -28,7 +28,6 @@ from scheduler.human import (
     solve_human_daily_timeline,
     write_human_daily_review,
 )
-
 
 SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples" / "human"
 REPO_ROOT = SAMPLES_DIR.parents[1]
@@ -190,10 +189,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [
-                slot.effective_capacity_minutes
-                for slot in fixture.time_slots
-            ],
+            [slot.effective_capacity_minutes for slot in fixture.time_slots],
             [60, 60, 45],
         )
 
@@ -229,10 +225,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [
-                slot.effective_capacity_minutes
-                for slot in fixture.time_slots
-            ],
+            [slot.effective_capacity_minutes for slot in fixture.time_slots],
             [60, 30],
         )
 
@@ -402,9 +395,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         starts_by_slot: dict[int, list[str]] = {}
         for block in report.plan.blocks:
-            starts_by_slot.setdefault(block.slot_index, []).append(
-                block.start.strftime("%H:%M")
-            )
+            starts_by_slot.setdefault(block.slot_index, []).append(block.start.strftime("%H:%M"))
 
         self.assertIn("09:00", starts_by_slot[0])
         self.assertGreater(starts_by_slot[0].count("09:00"), 1)
@@ -439,9 +430,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         )
         report = solve_human_daily_timeline(fixture)
 
-        slot_zero_blocks = [
-            block for block in report.plan.blocks if block.slot_index == 0
-        ]
+        slot_zero_blocks = [block for block in report.plan.blocks if block.slot_index == 0]
         slot_zero_starts = [block.start.strftime("%H:%M") for block in slot_zero_blocks]
 
         self.assertGreaterEqual(len(slot_zero_starts), 2)
@@ -456,9 +445,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         self.assertIn("surface_erasure_circuit", scheduled_ids)
         self.assertIn("stim_erasure_compiler", scheduled_ids)
-        self.assertEqual(
-            unscheduled["mid_ir_sync_design"], "dependency_not_scheduled"
-        )
+        self.assertEqual(unscheduled["mid_ir_sync_design"], "dependency_not_scheduled")
 
     def test_timeline_solver_waits_for_prerequisite_finish_time(self) -> None:
         fixture = HumanDailyFixture(
@@ -477,9 +464,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 ),
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="prerequisite", slot_index=1)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="prerequisite", slot_index=1)],
             task_dependencies={"dependent": ["prerequisite"]},
             tasks=[
                 HumanTask(
@@ -522,9 +507,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 ),
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="prerequisite", slot_index=10)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="prerequisite", slot_index=10)],
             task_dependencies={"dependent": ["prerequisite"]},
             tasks=[
                 HumanTask(
@@ -632,9 +615,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         report = solve_human_daily_timeline(fixture)
 
         self.assertEqual(report.plan.blocks[0].task_id, "prerequisite")
-        score = next(
-            item for item in report.score_breakdown if item.task_id == "prerequisite"
-        )
+        score = next(item for item in report.score_breakdown if item.task_id == "prerequisite")
         self.assertEqual(score.components["dependency_unlock"], 3)
 
     def test_timeline_solver_penalizes_short_gap_project_switches(self) -> None:
@@ -649,9 +630,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 )
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)],
             tasks=[
                 HumanTask(
                     id="alpha_fixed",
@@ -683,9 +662,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         report = solve_human_daily_timeline(fixture)
 
         self.assertEqual(report.plan.blocks[1].task_id, "alpha_followup")
-        beta_score = next(
-            item for item in report.score_breakdown if item.task_id == "beta_followup"
-        )
+        beta_score = next(item for item in report.score_breakdown if item.task_id == "beta_followup")
         self.assertEqual(beta_score.components["project_switch"], -10)
 
     def test_zero_project_switch_reset_gap_still_penalizes_contiguous_switch(
@@ -705,9 +682,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 )
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="alpha_fixed", slot_index=0)],
             tasks=[
                 HumanTask(
                     id="alpha_fixed",
@@ -730,9 +705,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         report = solve_human_daily_timeline(fixture)
 
-        beta_score = next(
-            item for item in report.score_breakdown if item.task_id == "beta_followup"
-        )
+        beta_score = next(item for item in report.score_breakdown if item.task_id == "beta_followup")
         self.assertEqual(beta_score.components["project_switch"], -10)
 
     def test_timeline_solver_penalizes_long_continuous_work(self) -> None:
@@ -750,9 +723,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 )
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="deep_work", slot_index=0)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="deep_work", slot_index=0)],
             tasks=[
                 HumanTask(
                     id="deep_work",
@@ -781,9 +752,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         report = solve_human_daily_timeline(fixture)
 
         self.assertEqual(report.plan.blocks[1].task_id, "short_followup")
-        long_score = next(
-            item for item in report.score_breakdown if item.task_id == "long_followup"
-        )
+        long_score = next(item for item in report.score_breakdown if item.task_id == "long_followup")
         self.assertEqual(long_score.components["continuous_work"], -8)
 
     def test_zero_break_reset_gap_still_counts_contiguous_work(self) -> None:
@@ -802,9 +771,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                 )
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="deep_work", slot_index=0)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="deep_work", slot_index=0)],
             tasks=[
                 HumanTask(
                     id="deep_work",
@@ -825,9 +792,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         report = solve_human_daily_timeline(fixture)
 
-        long_score = next(
-            item for item in report.score_breakdown if item.task_id == "long_followup"
-        )
+        long_score = next(item for item in report.score_breakdown if item.task_id == "long_followup")
         self.assertEqual(long_score.components["continuous_work"], -8)
 
     def test_timeline_solver_rewards_small_gap_fill(self) -> None:
@@ -845,9 +810,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     work_kind=HumanWorkKind.LIGHT_WORK,
                 )
             ],
-            fixed_assignments=[
-                HumanFixedAssignment(task_id="fixed_work", slot_index=0)
-            ],
+            fixed_assignments=[HumanFixedAssignment(task_id="fixed_work", slot_index=0)],
             tasks=[
                 HumanTask(
                     id="fixed_work",
@@ -876,9 +839,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         report = solve_human_daily_timeline(fixture)
 
         self.assertEqual(report.plan.blocks[1].task_id, "gap_filler")
-        score = next(
-            item for item in report.score_breakdown if item.task_id == "gap_filler"
-        )
+        score = next(item for item in report.score_breakdown if item.task_id == "gap_filler")
         self.assertEqual(score.components["gap_fill"], 10)
 
     def test_parses_phase_two_solver_config_fields(self) -> None:
@@ -963,9 +924,7 @@ class HumanDailyReviewTests(unittest.TestCase):
         self.assertIn("daily_deadline_pressure", output)
 
     def test_review_runs_flexible_fixture(self) -> None:
-        output = run_human_daily_review(
-            [SAMPLES_DIR / "daily_flexible_normal.yaml"]
-        )
+        output = run_human_daily_review([SAMPLES_DIR / "daily_flexible_normal.yaml"])
 
         self.assertIn("daily_flexible_normal", output)
         self.assertIn("Timeline", output)
@@ -1052,9 +1011,7 @@ class HumanDailyReviewTests(unittest.TestCase):
             env = dict(os.environ)
             existing_pythonpath = env.get("PYTHONPATH")
             env["PYTHONPATH"] = (
-                str(REPO_ROOT)
-                if not existing_pythonpath
-                else str(REPO_ROOT) + os.pathsep + existing_pythonpath
+                str(REPO_ROOT) if not existing_pythonpath else str(REPO_ROOT) + os.pathsep + existing_pythonpath
             )
 
             subprocess.run(
