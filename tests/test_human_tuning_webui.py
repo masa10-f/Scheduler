@@ -35,6 +35,8 @@ class HumanTuningWebUITest(unittest.TestCase):
         self.assertEqual([item["key"] for item in schema], [field.name for field in fields(HumanDailySolverConfig)])
         self.assertEqual(schema[0]["key"], "kind_match_score")
         self.assertEqual(schema[0]["group"], "Fit")
+        self.assertEqual(schema[0]["visibility"], "essential")
+        self.assertEqual({item["visibility"] for item in schema}, {"essential", "tuning", "expert"})
 
     def test_create_tuning_payload_applies_config_override(self) -> None:
         fixture = load_human_daily_fixture(DAILY_BASIC)

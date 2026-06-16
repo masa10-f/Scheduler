@@ -152,7 +152,10 @@ The command serves ``samples/human/*.yaml`` on ``http://127.0.0.1:8765`` by
 default. The UI lets you choose a fixture and solver, adjust every
 ``HumanDailySolverConfig`` field, rerun the solver, inspect the timeline,
 unscheduled tasks, violations, and score breakdown, then copy or download the
-current ``solver_config`` YAML.
+current ``solver_config`` YAML. Parameters are grouped behind three visibility
+levels: ``Essential`` for the first weights to try, ``Tuning`` for behavior
+refinement, and ``Expert`` for lower-level thresholds and report-oriented
+weights.
 
 Pass explicit fixture paths to expose a narrower review set:
 

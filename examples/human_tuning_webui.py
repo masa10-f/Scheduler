@@ -11,7 +11,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Literal, TypeAlias, cast
 from urllib.parse import parse_qs, urlparse
 
 import yaml
@@ -28,6 +28,7 @@ from scheduler.human import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FIXTURE_GLOB = "samples/human/*.yaml"
 MAX_REQUEST_BYTES = 128 * 1024
+ConfigVisibility: TypeAlias = Literal["essential", "tuning", "expert"]
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class ConfigControl:
     minimum: int
     maximum: int
     step: int = 1
+    visibility: ConfigVisibility = "expert"
     help: str = ""
 
 
@@ -48,6 +50,7 @@ CONFIG_CONTROLS: tuple[ConfigControl, ...] = (
         "Fit",
         0,
         30,
+        visibility="essential",
         help="Reward when task work_kind matches the slot work_kind.",
     ),
     ConfigControl(
@@ -56,21 +59,22 @@ CONFIG_CONTROLS: tuple[ConfigControl, ...] = (
         "Fit",
         0,
         30,
+        visibility="tuning",
         help="Fallback score when a task can run in a non-matching slot.",
     ),
-    ConfigControl("priority_score_base", "Priority base", "Priority", 1, 20),
-    ConfigControl("deadline_soon_days", "Deadline horizon", "Priority", 0, 14),
-    ConfigControl("deadline_score", "Deadline score", "Priority", 0, 30),
-    ConfigControl("overdue_score", "Overdue score", "Priority", 0, 80),
+    ConfigControl("priority_score_base", "Priority base", "Priority", 1, 20, visibility="essential"),
+    ConfigControl("deadline_soon_days", "Deadline horizon", "Priority", 0, 14, visibility="tuning"),
+    ConfigControl("deadline_score", "Deadline score", "Priority", 0, 30, visibility="essential"),
+    ConfigControl("overdue_score", "Overdue score", "Priority", 0, 80, visibility="tuning"),
     ConfigControl("fixed_assignment_score", "Fixed assignment", "Hard hints", 0, 200),
-    ConfigControl("dependency_unlock_score", "Dependency unlock", "Hard hints", 0, 30),
-    ConfigControl("project_switch_penalty", "Project switch", "Flow", 0, 30),
+    ConfigControl("dependency_unlock_score", "Dependency unlock", "Hard hints", 0, 30, visibility="tuning"),
+    ConfigControl("project_switch_penalty", "Project switch", "Flow", 0, 30, visibility="essential"),
     ConfigControl("project_switch_reset_gap_minutes", "Switch reset gap", "Flow", 0, 180, 5),
-    ConfigControl("long_continuous_threshold_minutes", "Long work threshold", "Flow", 0, 360, 5),
-    ConfigControl("long_continuous_penalty", "Long work penalty", "Flow", 0, 40),
+    ConfigControl("long_continuous_threshold_minutes", "Long work threshold", "Flow", 0, 360, 5, visibility="tuning"),
+    ConfigControl("long_continuous_penalty", "Long work penalty", "Flow", 0, 40, visibility="tuning"),
     ConfigControl("break_reset_gap_minutes", "Break reset gap", "Flow", 0, 180, 5),
     ConfigControl("small_gap_minutes", "Small gap", "Packing", 0, 120, 5),
-    ConfigControl("small_gap_fill_score", "Gap fill score", "Packing", 0, 30),
+    ConfigControl("small_gap_fill_score", "Gap fill score", "Packing", 0, 30, visibility="tuning"),
 )
 
 
@@ -352,6 +356,7 @@ def config_schema() -> list[dict[str, Any]]:
                 "min": control.minimum,
                 "max": control.maximum,
                 "step": control.step,
+                "visibility": control.visibility,
                 "help": control.help,
             }
         )
@@ -578,6 +583,28 @@ INDEX_HTML = """<!doctype html>
       text-transform: uppercase;
     }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .segmented button {
+      border: 0;
+      border-radius: 0;
+      min-width: 0;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .segmented button + button { border-left: 1px solid var(--line); }
+    .segmented button.active {
+      background: var(--accent-2);
+      color: #fff;
+    }
     .content {
       display: grid;
       grid-template-columns: minmax(330px, 0.9fr) minmax(360px, 1.1fr);
@@ -725,6 +752,14 @@ INDEX_HTML = """<!doctype html>
       </section>
       <section class="section">
         <h2>Parameters</h2>
+        <div class="field">
+          <label>Visibility</label>
+          <div class="segmented" id="visibilityControls">
+            <button class="active" type="button" data-visibility="essential">Essential</button>
+            <button type="button" data-visibility="tuning">Tuning</button>
+            <button type="button" data-visibility="expert">Expert</button>
+          </div>
+        </div>
         <div id="configControls"></div>
       </section>
       <section class="section">
@@ -777,6 +812,7 @@ INDEX_HTML = """<!doctype html>
       defaultConfig: {},
       schema: [],
       fixtures: [],
+      visibility: "essential",
       lastPayload: null,
     };
 
@@ -814,12 +850,14 @@ INDEX_HTML = """<!doctype html>
     function renderControls() {
       const container = $("configControls");
       container.innerHTML = "";
-      const groups = [...new Set(state.schema.map((item) => item.group))];
+      renderVisibilityControls();
+      const visibleSchema = state.schema.filter(isVisibleControl);
+      const groups = [...new Set(visibleSchema.map((item) => item.group))];
       for (const group of groups) {
         const groupNode = document.createElement("div");
         groupNode.className = "control-group";
         groupNode.innerHTML = `<h3>${escapeHtml(group)}</h3>`;
-        for (const item of state.schema.filter((entry) => entry.group === group)) {
+        for (const item of visibleSchema.filter((entry) => entry.group === group)) {
           const wrapper = document.createElement("div");
           wrapper.className = "field";
           wrapper.innerHTML = `
@@ -849,6 +887,13 @@ INDEX_HTML = """<!doctype html>
       });
       $("fixtureSelect").addEventListener("change", runSolve);
       $("solverSelect").addEventListener("change", runSolve);
+      for (const button of document.querySelectorAll("[data-visibility]")) {
+        button.addEventListener("click", (event) => {
+          state.visibility = event.target.dataset.visibility;
+          renderControls();
+          bindControlEvents();
+        });
+      }
       $("copyYamlButton").addEventListener("click", async () => {
         await navigator.clipboard.writeText($("yamlExport").value);
       });
@@ -861,6 +906,17 @@ INDEX_HTML = """<!doctype html>
         URL.revokeObjectURL(link.href);
       });
       bindControlEvents();
+    }
+
+    function renderVisibilityControls() {
+      for (const button of document.querySelectorAll("[data-visibility]")) {
+        button.classList.toggle("active", button.dataset.visibility === state.visibility);
+      }
+    }
+
+    function isVisibleControl(item) {
+      const ranks = { essential: 0, tuning: 1, expert: 2 };
+      return ranks[item.visibility] <= ranks[state.visibility];
     }
 
     function bindControlEvents() {
