@@ -10,10 +10,12 @@ problems. It contains a generic task/resource solver API and an experimental
    :caption: Contents
 
    quickstart
+   human-flexible-review
    api/index
 
 Project Links
 -------------
 
 * :doc:`quickstart`
+* :doc:`human-flexible-review`
 * :doc:`api/index`
