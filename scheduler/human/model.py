@@ -1,3 +1,5 @@
+"""HumanCompiler-oriented scheduling data model."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -46,19 +48,14 @@ class HumanTask:
             raise ValueError("priority must be between 1 and 5")
         if self.min_chunk_minutes is not None and self.min_chunk_minutes <= 0:
             raise ValueError("min_chunk_minutes must be positive")
-        if (
-            self.preferred_chunk_minutes is not None
-            and self.preferred_chunk_minutes <= 0
-        ):
+        if self.preferred_chunk_minutes is not None and self.preferred_chunk_minutes <= 0:
             raise ValueError("preferred_chunk_minutes must be positive")
         if (
             self.min_chunk_minutes is not None
             and self.preferred_chunk_minutes is not None
             and self.preferred_chunk_minutes < self.min_chunk_minutes
         ):
-            raise ValueError(
-                "preferred_chunk_minutes must be at least min_chunk_minutes"
-            )
+            raise ValueError("preferred_chunk_minutes must be at least min_chunk_minutes")
 
 
 @dataclass(frozen=True)
@@ -215,13 +212,9 @@ class HumanDailySolverConfig:
         if self.project_switch_penalty < 0:
             raise ValueError("project_switch_penalty must be non-negative")
         if self.project_switch_reset_gap_minutes < 0:
-            raise ValueError(
-                "project_switch_reset_gap_minutes must be non-negative"
-            )
+            raise ValueError("project_switch_reset_gap_minutes must be non-negative")
         if self.long_continuous_threshold_minutes < 0:
-            raise ValueError(
-                "long_continuous_threshold_minutes must be non-negative"
-            )
+            raise ValueError("long_continuous_threshold_minutes must be non-negative")
         if self.long_continuous_penalty < 0:
             raise ValueError("long_continuous_penalty must be non-negative")
         if self.break_reset_gap_minutes < 0:
@@ -241,9 +234,7 @@ class HumanDailyFixture:
     time_slots: list[HumanTimeSlot]
     fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
     task_dependencies: dict[str, list[str]] = field(default_factory=dict)
-    solver_config: HumanDailySolverConfig = field(
-        default_factory=HumanDailySolverConfig
-    )
+    solver_config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
 
 
@@ -258,14 +249,14 @@ class HumanFlexibleDailyFixture:
     now: datetime | None = None
     fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
     task_dependencies: dict[str, list[str]] = field(default_factory=dict)
-    solver_config: HumanDailySolverConfig = field(
-        default_factory=HumanDailySolverConfig
-    )
+    solver_config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class HumanUnscheduledTask:
+    """Task omitted from a generated human daily plan."""
+
     task_id: str
     title: str
     reason: str
@@ -273,6 +264,8 @@ class HumanUnscheduledTask:
 
 @dataclass(frozen=True)
 class HumanConstraintViolation:
+    """Human daily scheduling validation message."""
+
     code: str
     message: str
     task_id: str | None = None
@@ -281,6 +274,8 @@ class HumanConstraintViolation:
 
 @dataclass(frozen=True)
 class HumanScoreBreakdown:
+    """Score details for one task and slot pairing."""
+
     task_id: str
     slot_index: int
     total: int
@@ -289,6 +284,8 @@ class HumanScoreBreakdown:
 
 @dataclass(frozen=True)
 class HumanSolverReport:
+    """Detailed result from one human daily solver."""
+
     solver_name: str
     plan: HumanDailyPlan
     unscheduled_tasks: list[HumanUnscheduledTask] = field(default_factory=list)
@@ -299,5 +296,7 @@ class HumanSolverReport:
 
 @dataclass(frozen=True)
 class HumanSolverComparison:
+    """Collection of solver reports for the same fixture."""
+
     fixture: HumanDailyFixture
     reports: dict[str, HumanSolverReport]

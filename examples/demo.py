@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from scheduler import default_constraints, load_problem_yaml, solve_cp_sat, solve_greedy
+from scheduler import (
+    Schedule,
+    Violation,
+    default_constraints,
+    load_problem_yaml,
+    solve_cp_sat,
+    solve_greedy,
+)
 
 
-def _print_schedule(title: str, schedule) -> None:
+def _print_schedule(title: str, schedule: Schedule) -> None:
     print(f"\n{title}")
     for assignment in sorted(
         schedule.assignments.values(),
         key=lambda item: (item.start, item.resource_id, item.task_id),
     ):
-        print(
-            f"- task={assignment.task_id} resource={assignment.resource_id} "
-            f"start={assignment.start}"
-        )
+        print(f"- task={assignment.task_id} resource={assignment.resource_id} start={assignment.start}")
 
 
-def _print_violations(violations) -> None:
+def _print_violations(violations: list[Violation]) -> None:
     if not violations:
         print("  violations: none")
         return

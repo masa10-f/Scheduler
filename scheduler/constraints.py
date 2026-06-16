@@ -1,3 +1,5 @@
+"""Constraint evaluation for schedules."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -8,6 +10,8 @@ from scheduler.model import Problem, Schedule, TimeWindow
 
 @dataclass(frozen=True)
 class Violation:
+    """A single constraint violation detected in a schedule."""
+
     constraint: str
     message: str
     task_id: str | None = None
@@ -16,15 +20,17 @@ class Violation:
 
 
 class Constraint:
+    """Base class for schedule constraints."""
+
     name = "constraint"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return violations for the given problem and schedule."""
         raise NotImplementedError
 
 
-def evaluate_constraints(
-    problem: Problem, schedule: Schedule, constraints: Iterable[Constraint]
-) -> list[Violation]:
+def evaluate_constraints(problem: Problem, schedule: Schedule, constraints: Iterable[Constraint]) -> list[Violation]:
+    """Evaluate all constraints and return the combined violations."""
     violations: list[Violation] = []
     for constraint in constraints:
         violations.extend(constraint.violations(problem, schedule))
@@ -32,9 +38,12 @@ def evaluate_constraints(
 
 
 class TimeWindowConstraint(Constraint):
+    """Validate task earliest-start and latest-end windows."""
+
     name = "time_window"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return time-window violations."""
         results: list[Violation] = []
         for assignment in schedule.iter_assignments():
             if assignment.task_id not in problem.tasks:
@@ -45,10 +54,7 @@ class TimeWindowConstraint(Constraint):
                 results.append(
                     Violation(
                         constraint=self.name,
-                        message=(
-                            f"task starts before earliest_start "
-                            f"({assignment.start} < {task.earliest_start})"
-                        ),
+                        message=(f"task starts before earliest_start ({assignment.start} < {task.earliest_start})"),
                         task_id=assignment.task_id,
                         resource_id=assignment.resource_id,
                         magnitude=task.earliest_start - assignment.start,
@@ -58,10 +64,7 @@ class TimeWindowConstraint(Constraint):
                 results.append(
                     Violation(
                         constraint=self.name,
-                        message=(
-                            f"task ends after latest_end "
-                            f"({end} > {task.latest_end})"
-                        ),
+                        message=(f"task ends after latest_end ({end} > {task.latest_end})"),
                         task_id=assignment.task_id,
                         resource_id=assignment.resource_id,
                         magnitude=end - task.latest_end,
@@ -71,9 +74,12 @@ class TimeWindowConstraint(Constraint):
 
 
 class PrecedenceConstraint(Constraint):
+    """Validate precedence relationships between scheduled tasks."""
+
     name = "precedence"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return precedence violations."""
         results: list[Violation] = []
         for prec in problem.precedences:
             before = schedule.assignment_for(prec.before)
@@ -103,9 +109,12 @@ class PrecedenceConstraint(Constraint):
 
 
 class ResourceEligibilityConstraint(Constraint):
+    """Validate that tasks are assigned only to eligible resources."""
+
     name = "resource_eligibility"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return resource eligibility violations."""
         results: list[Violation] = []
         for assignment in schedule.iter_assignments():
             if assignment.task_id not in problem.tasks:
@@ -118,10 +127,7 @@ class ResourceEligibilityConstraint(Constraint):
                 results.append(
                     Violation(
                         constraint=self.name,
-                        message=(
-                            f"resource {assignment.resource_id} is not eligible "
-                            f"for task {assignment.task_id}"
-                        ),
+                        message=(f"resource {assignment.resource_id} is not eligible for task {assignment.task_id}"),
                         task_id=assignment.task_id,
                         resource_id=assignment.resource_id,
                     )
@@ -130,9 +136,12 @@ class ResourceEligibilityConstraint(Constraint):
 
 
 class ResourceAvailabilityConstraint(Constraint):
+    """Validate that assignments fit resource availability windows."""
+
     name = "resource_availability"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return resource availability violations."""
         results: list[Violation] = []
         for assignment in schedule.iter_assignments():
             if assignment.task_id not in problem.tasks:
@@ -143,15 +152,12 @@ class ResourceAvailabilityConstraint(Constraint):
             resource = problem.resource(assignment.resource_id)
             if resource.availability is None:
                 continue
-            if not _interval_within_windows(
-                assignment.start, assignment.end(task), resource.availability
-            ):
+            if not _interval_within_windows(assignment.start, assignment.end(task), resource.availability):
                 results.append(
                     Violation(
                         constraint=self.name,
                         message=(
-                            f"task {assignment.task_id} not within availability "
-                            f"of resource {assignment.resource_id}"
+                            f"task {assignment.task_id} not within availability of resource {assignment.resource_id}"
                         ),
                         task_id=assignment.task_id,
                         resource_id=assignment.resource_id,
@@ -161,9 +167,12 @@ class ResourceAvailabilityConstraint(Constraint):
 
 
 class ResourceCapacityConstraint(Constraint):
+    """Validate that resource capacity is not exceeded."""
+
     name = "resource_capacity"
 
     def violations(self, problem: Problem, schedule: Schedule) -> list[Violation]:
+        """Return resource capacity violations."""
         usage: dict[str, dict[int, int]] = {}
         for assignment in schedule.iter_assignments():
             if assignment.task_id not in problem.tasks:
@@ -185,10 +194,7 @@ class ResourceCapacityConstraint(Constraint):
                     results.append(
                         Violation(
                             constraint=self.name,
-                            message=(
-                                f"resource {resource_id} over capacity at t={t} "
-                                f"({used} > {capacity})"
-                            ),
+                            message=(f"resource {resource_id} over capacity at t={t} ({used} > {capacity})"),
                             resource_id=resource_id,
                             magnitude=used - capacity,
                         )
@@ -197,6 +203,7 @@ class ResourceCapacityConstraint(Constraint):
 
 
 def default_constraints() -> list[Constraint]:
+    """Return the default constraint set used by solvers."""
     return [
         TimeWindowConstraint(),
         PrecedenceConstraint(),
@@ -206,10 +213,5 @@ def default_constraints() -> list[Constraint]:
     ]
 
 
-def _interval_within_windows(
-    start: int, end: int, windows: Sequence[TimeWindow]
-) -> bool:
-    for window_start, window_end in windows:
-        if start >= window_start and end <= window_end:
-            return True
-    return False
+def _interval_within_windows(start: int, end: int, windows: Sequence[TimeWindow]) -> bool:
+    return any(start >= window_start and end <= window_end for window_start, window_end in windows)

@@ -1,17 +1,22 @@
+"""YAML input helpers for HumanCompiler-oriented daily scheduling."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, time
+from operator import itemgetter
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .model import (
     HumanAvailabilityWindow,
     HumanDailyFixture,
     HumanDailySolverConfig,
+    HumanFixedAssignment,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
-    HumanFixedAssignment,
     HumanMetadataValue,
     HumanTask,
     HumanTaskSource,
@@ -21,6 +26,7 @@ from .model import (
 
 
 def load_human_daily_fixture(path: str | Path) -> HumanDailyFixture:
+    """Load a Human daily fixture from YAML."""
     fixture_path = Path(path)
     data = _load_yaml(fixture_path)
     if data.get("task_database") is not None:
@@ -29,16 +35,16 @@ def load_human_daily_fixture(path: str | Path) -> HumanDailyFixture:
 
 
 def load_human_daily_solver_config(path: str | Path) -> HumanDailySolverConfig:
+    """Load a Human daily solver config from YAML."""
     data = _load_yaml(path)
     raw_config = data.get("solver_config", data)
     return human_daily_solver_config_from_dict(raw_config)
 
 
 def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
+    """Build a Human daily fixture from a mapping."""
     if data.get("time_slots") is None and data.get("availability_windows") is not None:
-        return compile_human_flexible_daily_fixture(
-            human_flexible_daily_fixture_from_dict(data)
-        )
+        return compile_human_flexible_daily_fixture(human_flexible_daily_fixture_from_dict(data))
     return HumanDailyFixture(
         date=_parse_date(_required(data, "date")),
         tasks=_parse_tasks(_required(data, "tasks")),
@@ -53,12 +59,11 @@ def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
 def human_flexible_daily_fixture_from_dict(
     data: Mapping[str, Any],
 ) -> HumanFlexibleDailyFixture:
+    """Build a flexible Human daily fixture from a mapping."""
     return HumanFlexibleDailyFixture(
         date=_parse_date(_required(data, "date")),
         tasks=_parse_tasks(_required(data, "tasks")),
-        availability_windows=_parse_availability_windows(
-            _required(data, "availability_windows")
-        ),
+        availability_windows=_parse_availability_windows(_required(data, "availability_windows")),
         fixed_events=_parse_fixed_events(data.get("fixed_events", [])),
         now=_parse_datetime_or_none(data.get("now")),
         fixed_assignments=_parse_fixed_assignments(data.get("fixed_assignments", [])),
@@ -71,12 +76,14 @@ def human_flexible_daily_fixture_from_dict(
 def human_daily_solver_config_from_dict(
     data: Mapping[str, Any],
 ) -> HumanDailySolverConfig:
+    """Build a Human daily solver config from a mapping."""
     return _parse_solver_config(data)
 
 
 def compile_human_flexible_daily_fixture(
     fixture: HumanFlexibleDailyFixture,
 ) -> HumanDailyFixture:
+    """Compile flexible availability into concrete daily time slots."""
     return HumanDailyFixture(
         date=fixture.date,
         tasks=fixture.tasks,
@@ -108,16 +115,10 @@ def _merge_task_database(
 
 
 def _load_yaml(path: str | Path) -> Mapping[str, Any]:
-    try:
-        import yaml  # type: ignore
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "PyYAML is required for YAML input. Install with `pip install pyyaml`."
-        ) from exc
     with Path(path).open("r", encoding="utf-8") as handle:
         loaded = yaml.safe_load(handle) or {}
     if not isinstance(loaded, Mapping):
-        raise ValueError("fixture root must be a mapping")
+        raise TypeError("fixture root must be a mapping")
     return loaded
 
 
@@ -137,14 +138,10 @@ def _parse_tasks(raw: Any) -> list[HumanTask]:
                 source=_parse_task_source(task.get("source", "task")),
                 split_allowed=_parse_bool(task.get("split_allowed", False)),
                 min_chunk_minutes=(
-                    int(task["min_chunk_minutes"])
-                    if task.get("min_chunk_minutes") is not None
-                    else None
+                    int(task["min_chunk_minutes"]) if task.get("min_chunk_minutes") is not None else None
                 ),
                 preferred_chunk_minutes=(
-                    int(task["preferred_chunk_minutes"])
-                    if task.get("preferred_chunk_minutes") is not None
-                    else None
+                    int(task["preferred_chunk_minutes"]) if task.get("preferred_chunk_minutes") is not None else None
                 ),
                 metadata=_parse_metadata(task.get("metadata", {})),
             )
@@ -162,11 +159,7 @@ def _parse_time_slots(raw: Any) -> list[HumanTimeSlot]:
                 start=_parse_time(_required(slot, "start")),
                 end=_parse_time(_required(slot, "end")),
                 work_kind=_parse_work_kind(slot.get("work_kind", "light_work")),
-                capacity_minutes=(
-                    int(slot["capacity_minutes"])
-                    if slot.get("capacity_minutes") is not None
-                    else None
-                ),
+                capacity_minutes=(int(slot["capacity_minutes"]) if slot.get("capacity_minutes") is not None else None),
                 assigned_project_id=_optional_str(slot.get("assigned_project_id")),
                 metadata=_parse_metadata(slot.get("metadata", {})),
             )
@@ -184,9 +177,7 @@ def _parse_availability_windows(raw: Any) -> list[HumanAvailabilityWindow]:
                 end=_parse_time(_required(window, "end")),
                 work_kind=_parse_work_kind(work_kind),
                 capacity_minutes=(
-                    int(window["capacity_minutes"])
-                    if window.get("capacity_minutes") is not None
-                    else None
+                    int(window["capacity_minutes"]) if window.get("capacity_minutes") is not None else None
                 ),
                 assigned_project_id=_optional_str(window.get("assigned_project_id")),
                 metadata=_parse_metadata(window.get("metadata", {})),
@@ -224,11 +215,7 @@ def _parse_fixed_assignments(raw: Any) -> list[HumanFixedAssignment]:
             HumanFixedAssignment(
                 task_id=str(_required(item, "task_id")),
                 slot_index=int(_required(item, "slot_index")),
-                duration_minutes=(
-                    int(item["duration_minutes"])
-                    if item.get("duration_minutes") is not None
-                    else None
-                ),
+                duration_minutes=(int(item["duration_minutes"]) if item.get("duration_minutes") is not None else None),
             )
         )
     return fixed_assignments
@@ -244,9 +231,7 @@ def _parse_task_dependencies(raw: Any) -> dict[str, list[str]]:
             if not isinstance(item, Mapping):
                 continue
             task_id = str(_required(item, "task_id"))
-            dependencies[task_id] = [
-                str(value) for value in _as_sequence(item.get("depends_on", []))
-            ]
+            dependencies[task_id] = [str(value) for value in _as_sequence(item.get("depends_on", []))]
     return dependencies
 
 
@@ -263,12 +248,8 @@ def _parse_solver_config(raw: Any) -> HumanDailySolverConfig:
         fixed_assignment_score=int(raw.get("fixed_assignment_score", 100)),
         dependency_unlock_score=int(raw.get("dependency_unlock_score", 3)),
         project_switch_penalty=int(raw.get("project_switch_penalty", 4)),
-        project_switch_reset_gap_minutes=int(
-            raw.get("project_switch_reset_gap_minutes", 30)
-        ),
-        long_continuous_threshold_minutes=int(
-            raw.get("long_continuous_threshold_minutes", 120)
-        ),
+        project_switch_reset_gap_minutes=int(raw.get("project_switch_reset_gap_minutes", 30)),
+        long_continuous_threshold_minutes=int(raw.get("long_continuous_threshold_minutes", 120)),
         long_continuous_penalty=int(raw.get("long_continuous_penalty", 5)),
         break_reset_gap_minutes=int(raw.get("break_reset_gap_minutes", 20)),
         small_gap_minutes=int(raw.get("small_gap_minutes", 15)),
@@ -294,41 +275,35 @@ def _generate_time_slots(
             window_segments = _subtract_event_segments(window_segments, event)
         for start_minutes, end_minutes in window_segments:
             if end_minutes > start_minutes:
-                raw_segments.append(
-                    (start_minutes, end_minutes, window_index, window)
-                )
+                raw_segments.append((start_minutes, end_minutes, window_index, window))
 
     slots: list[HumanTimeSlot] = []
     remaining_capacity_by_window = {
-        window_index: window.capacity_minutes
-        for window_index, window in enumerate(availability_windows)
+        window_index: window.capacity_minutes for window_index, window in enumerate(availability_windows)
     }
     sorted_segments = sorted(
         raw_segments,
-        key=lambda item: (item[0], item[1], item[2]),
+        key=itemgetter(0, 1, 2),
     )
-    for index, (start_minutes, end_minutes, window_index, window) in enumerate(
-        sorted_segments
-    ):
+    for index, (start_minutes, end_minutes, window_index, window) in enumerate(sorted_segments):
+        slot_start_minutes = start_minutes
         if now_minutes is not None:
             if end_minutes <= now_minutes:
                 continue
-            start_minutes = max(start_minutes, now_minutes)
-        if end_minutes <= start_minutes:
+            slot_start_minutes = max(slot_start_minutes, now_minutes)
+        if end_minutes <= slot_start_minutes:
             continue
-        duration_minutes = end_minutes - start_minutes
+        duration_minutes = end_minutes - slot_start_minutes
         capacity_minutes = None
         remaining_capacity = remaining_capacity_by_window[window_index]
         if remaining_capacity is not None:
             assigned_capacity = min(remaining_capacity, duration_minutes)
             capacity_minutes = assigned_capacity
-            remaining_capacity_by_window[window_index] = (
-                remaining_capacity - assigned_capacity
-            )
+            remaining_capacity_by_window[window_index] = remaining_capacity - assigned_capacity
         slots.append(
             HumanTimeSlot(
                 index=index,
-                start=_time_from_minutes(start_minutes),
+                start=_time_from_minutes(slot_start_minutes),
                 end=_time_from_minutes(end_minutes),
                 work_kind=window.work_kind,
                 capacity_minutes=capacity_minutes,
@@ -463,5 +438,6 @@ def _optional_str(raw: Any) -> str | None:
 
 def _required(data: Mapping[str, Any], key: str) -> Any:
     if key not in data:
-        raise ValueError(f"missing required field: {key}")
+        message = f"missing required field: {key}"
+        raise ValueError(message)
     return data[key]

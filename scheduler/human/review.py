@@ -21,13 +21,10 @@ def run_human_daily_review(
     output_format: HumanDailyReviewFormat = "text",
 ) -> str:
     """Run one or more Human daily fixtures and return review text."""
-
     if not paths:
         raise ValueError("at least one fixture path is required")
 
-    comparisons = [
-        _load_comparison(path, config_override=config_override) for path in paths
-    ]
+    comparisons = [_load_comparison(path, config_override=config_override) for path in paths]
     if output_format == "text":
         return format_human_daily_review_text(comparisons, solver_name=solver_name)
     if output_format == "markdown":
@@ -44,7 +41,6 @@ def write_human_daily_review(
     output_format: HumanDailyReviewFormat = "text",
 ) -> str:
     """Run a review, write it to disk, and return the rendered text."""
-
     rendered = run_human_daily_review(
         paths,
         solver_name=solver_name,
@@ -69,11 +65,7 @@ def format_human_daily_review_text(
     for index, comparison in enumerate(comparisons):
         if index > 0:
             lines.append("")
-        lines.append(
-            format_human_daily_compact(
-                comparison, solver_name=solver_name
-            ).rstrip()
-        )
+        lines.append(format_human_daily_compact(comparison, solver_name=solver_name).rstrip())
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -97,9 +89,7 @@ def format_human_daily_review_markdown(
                 f"## {fixture_name}",
                 "",
                 "```text",
-                format_human_daily_compact(
-                    comparison, solver_name=solver_name
-                ).rstrip(),
+                format_human_daily_compact(comparison, solver_name=solver_name).rstrip(),
                 "```",
                 "",
             ]

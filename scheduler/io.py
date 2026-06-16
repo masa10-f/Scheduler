@@ -1,23 +1,30 @@
+"""YAML input helpers for generic scheduling problems."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from scheduler.model import Assignment, Precedence, Problem, Resource, Schedule, Task, TimeWindow
 
 
 def load_problem_yaml(path: str | Path) -> Problem:
+    """Load a problem from a YAML file."""
     data = _load_yaml(path)
     return problem_from_dict(data)
 
 
 def load_schedule_yaml(path: str | Path) -> Schedule:
+    """Load a schedule from a YAML file."""
     data = _load_yaml(path)
     return schedule_from_dict(data)
 
 
 def problem_from_dict(data: Mapping[str, Any]) -> Problem:
+    """Build a problem from a mapping."""
     tasks_data = data.get("tasks", {})
     resources_data = data.get("resources", {})
     precedences_data = data.get("precedences", [])
@@ -65,6 +72,7 @@ def problem_from_dict(data: Mapping[str, Any]) -> Problem:
 
 
 def schedule_from_dict(data: Mapping[str, Any]) -> Schedule:
+    """Build a schedule from a mapping."""
     assignments_data = data.get("assignments", [])
     assignments: dict[str, Assignment] = {}
     for item in assignments_data:
@@ -79,12 +87,6 @@ def schedule_from_dict(data: Mapping[str, Any]) -> Schedule:
 
 
 def _load_yaml(path: str | Path) -> Mapping[str, Any]:
-    try:
-        import yaml  # type: ignore
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "PyYAML is required for YAML input. Install with `pip install pyyaml`."
-        ) from exc
     with Path(path).open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}
 
@@ -105,14 +107,11 @@ def _iter_named_items(data: Any) -> Iterable[tuple[str, Mapping[str, Any]]]:
 def _parse_windows(raw: Any) -> Sequence[TimeWindow] | None:
     if raw is None:
         return None
-    windows: list[TimeWindow] = []
-    for item in raw:
-        if isinstance(item, (list, tuple)) and len(item) == 2:
-            windows.append((int(item[0]), int(item[1])))
-    return windows
+    return [(int(item[0]), int(item[1])) for item in raw if isinstance(item, (list, tuple)) and len(item) == 2]
 
 
 def _required(data: Mapping[str, Any], key: str) -> Any:
     if key not in data:
-        raise ValueError(f"missing required field: {key}")
+        message = f"missing required field: {key}"
+        raise ValueError(message)
     return data[key]

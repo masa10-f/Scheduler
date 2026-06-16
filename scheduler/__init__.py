@@ -1,3 +1,5 @@
+"""Public API for the taskagent scheduler package."""
+
 from .constraints import (
     Constraint,
     PrecedenceConstraint,
@@ -24,17 +26,17 @@ __all__ = [
     "ResourceCapacityConstraint",
     "ResourceEligibilityConstraint",
     "Schedule",
+    "SolverResult",
     "Task",
     "TimeWindowConstraint",
     "Violation",
-    "SolverResult",
     "compare_solvers",
     "default_constraints",
     "evaluate_constraints",
     "load_problem_yaml",
     "load_schedule_yaml",
     "problem_from_dict",
+    "schedule_from_dict",
     "solve_cp_sat",
     "solve_greedy",
-    "schedule_from_dict",
 ]

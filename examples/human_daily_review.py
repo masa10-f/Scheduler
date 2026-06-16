@@ -37,9 +37,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    config_override = (
-        load_human_daily_solver_config(args.config) if args.config else None
-    )
+    config_override = load_human_daily_solver_config(args.config) if args.config else None
     if args.output:
         write_human_daily_review(
             args.paths,
