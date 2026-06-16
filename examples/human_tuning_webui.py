@@ -105,7 +105,6 @@ class SchedulerTuningHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class TuningRequestHandler(BaseHTTPRequestHandler):
-    server: SchedulerTuningHTTPServer
     error_content_type = "application/json"
     server_version = "SchedulerTuningWebUI/0.1"
 
@@ -125,7 +124,9 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if parsed.path == "/api/fixtures":
-            self._send_json({"fixtures": [fixture_entry_to_dict(item) for item in self.server.state.fixtures.values()]})
+            self._send_json(
+                {"fixtures": [fixture_entry_to_dict(item) for item in self._tuning_server().state.fixtures.values()]}
+            )
             return
         if parsed.path == "/api/default-config":
             self._send_json(
@@ -157,9 +158,9 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json_body()
             fixture_id = str(payload.get("fixture_id", ""))
-            solver_name = str(payload.get("solver_name", self.server.state.default_solver))
+            solver_name = str(payload.get("solver_name", self._tuning_server().state.default_solver))
             config = human_daily_solver_config_from_dict(_mapping(payload.get("config", {})))
-            fixture_entry = self.server.state.fixtures[fixture_id]
+            fixture_entry = self._tuning_server().state.fixtures[fixture_id]
         except KeyError:
             self._send_error(HTTPStatus.NOT_FOUND, "unknown fixture")
             return
@@ -177,6 +178,9 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002, ARG002, PLR6301
         return
+
+    def _tuning_server(self) -> SchedulerTuningHTTPServer:
+        return cast("SchedulerTuningHTTPServer", self.server)
 
     def _read_json_body(self) -> Mapping[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
