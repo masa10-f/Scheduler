@@ -168,7 +168,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
         try:
             fixture = load_human_daily_fixture(fixture_entry.path)
             if config_override is not None:
-                fixture = replace(fixture, solver_config=config_override)
+                fixture = replace(fixture, solver_config=merge_solver_config(fixture.solver_config, config_override))
             response = create_tuning_payload(fixture_entry, fixture, solver_name)
         except (KeyError, TypeError, ValueError) as exc:
             self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -181,12 +181,12 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
     def _tuning_server(self) -> SchedulerTuningHTTPServer:
         return cast("SchedulerTuningHTTPServer", self.server)
 
-    def _read_solve_request(self) -> tuple[FixtureEntry, str, HumanDailySolverConfig | None]:
+    def _read_solve_request(self) -> tuple[FixtureEntry, str, Mapping[str, Any] | None]:
         payload = self._read_json_body()
         fixture_id = str(payload.get("fixture_id", ""))
         solver_name = str(payload.get("solver_name", self._tuning_server().state.default_solver))
         raw_config = payload.get("config")
-        config_override = None if raw_config is None else human_daily_solver_config_from_dict(_mapping(raw_config))
+        config_override = None if raw_config is None else _mapping(raw_config)
         return self._tuning_server().state.fixtures[fixture_id], solver_name, config_override
 
     def _read_json_body(self) -> Mapping[str, Any]:
@@ -352,6 +352,10 @@ def fixture_entry_to_dict(entry: FixtureEntry) -> dict[str, str]:
 
 def solver_config_to_dict(config: HumanDailySolverConfig) -> dict[str, int]:
     return {field.name: cast("int", value) for field in fields(config) for value in [getattr(config, field.name)]}
+
+
+def merge_solver_config(base: HumanDailySolverConfig, raw_override: Mapping[str, Any]) -> HumanDailySolverConfig:
+    return human_daily_solver_config_from_dict({**solver_config_to_dict(base), **raw_override})
 
 
 def config_schema() -> list[dict[str, Any]]:

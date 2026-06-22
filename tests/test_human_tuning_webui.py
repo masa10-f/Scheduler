@@ -108,6 +108,9 @@ class HumanTuningWebUITest(unittest.TestCase):
 
             self.assertEqual(payload["fixture"]["id"], fixture_id)
             self.assertEqual(payload["config"]["priority_score_base"], 10)
+            self.assertEqual(payload["config"]["dependency_unlock_score"], 5)
+            self.assertEqual(payload["config"]["project_switch_penalty"], 6)
+            self.assertEqual(payload["config"]["small_gap_fill_score"], 3)
             self.assertEqual(payload["selected_report"]["solver_name"], "timeline_greedy")
         finally:
             server.shutdown()
