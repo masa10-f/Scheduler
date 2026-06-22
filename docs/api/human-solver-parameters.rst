@@ -138,6 +138,31 @@ Use these rules of thumb:
 * If slots are left with unusable fragments of time, increase
   ``small_gap_fill_score`` or ``small_gap_minutes``.
 
+Standalone Tuning WebUI
+-----------------------
+
+Use the local WebUI when you want to tune several parameters against the sample
+fixtures without repeatedly editing YAML by hand:
+
+.. code-block:: console
+
+   uv run python examples/human_tuning_webui.py
+
+The command serves ``samples/human/*.yaml`` on ``http://127.0.0.1:8765`` by
+default. The UI lets you choose a fixture and solver, adjust every
+``HumanDailySolverConfig`` field, rerun the solver, inspect the timeline,
+unscheduled tasks, violations, and score breakdown, then copy or download the
+current ``solver_config`` YAML. Parameters are grouped behind three visibility
+levels: ``Essential`` for the first weights to try, ``Tuning`` for behavior
+refinement, and ``Expert`` for lower-level thresholds and report-oriented
+weights.
+
+Pass explicit fixture paths to expose a narrower review set:
+
+.. code-block:: console
+
+   uv run python examples/human_tuning_webui.py samples/human/daily_flexible_*.yaml
+
 Example YAML
 ------------
 
