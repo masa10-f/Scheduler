@@ -114,6 +114,46 @@ class HumanTuningWebUITest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
+    def test_http_api_uses_fixture_config_when_override_is_missing(self) -> None:
+        registry = build_fixture_registry([DAILY_BASIC], repo_root=REPO_ROOT)
+        server = SchedulerTuningHTTPServer(
+            ("127.0.0.1", 0),
+            TuningRequestHandler,
+            WebUIState(fixtures=registry, default_solver="legacy_slot"),
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            fixture_id = next(iter(registry))
+            with request.urlopen(f"{base_url}/api/default-config", timeout=5) as response:  # noqa: S310
+                defaults = json.loads(response.read().decode("utf-8"))
+            body = json.dumps(
+                {
+                    "fixture_id": fixture_id,
+                    "solver_name": "legacy_slot",
+                }
+            ).encode("utf-8")
+            req = request.Request(  # noqa: S310
+                f"{base_url}/api/solve",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            with request.urlopen(req, timeout=5) as response:  # noqa: S310
+                payload = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(defaults["default_solver"], "legacy_slot")
+            self.assertEqual(payload["config"]["dependency_unlock_score"], 5)
+            self.assertEqual(payload["config"]["project_switch_penalty"], 6)
+            self.assertEqual(payload["config"]["small_gap_fill_score"], 3)
+            self.assertEqual(payload["selected_report"]["solver_name"], "legacy_slot")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

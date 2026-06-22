@@ -132,6 +132,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "config": solver_config_to_dict(HumanDailySolverConfig()),
+                    "default_solver": self._tuning_server().state.default_solver,
                     "schema": config_schema(),
                 }
             )
@@ -156,11 +157,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            payload = self._read_json_body()
-            fixture_id = str(payload.get("fixture_id", ""))
-            solver_name = str(payload.get("solver_name", self._tuning_server().state.default_solver))
-            config = human_daily_solver_config_from_dict(_mapping(payload.get("config", {})))
-            fixture_entry = self._tuning_server().state.fixtures[fixture_id]
+            fixture_entry, solver_name, config_override = self._read_solve_request()
         except KeyError:
             self._send_error(HTTPStatus.NOT_FOUND, "unknown fixture")
             return
@@ -169,7 +166,9 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            fixture = replace(load_human_daily_fixture(fixture_entry.path), solver_config=config)
+            fixture = load_human_daily_fixture(fixture_entry.path)
+            if config_override is not None:
+                fixture = replace(fixture, solver_config=config_override)
             response = create_tuning_payload(fixture_entry, fixture, solver_name)
         except (KeyError, TypeError, ValueError) as exc:
             self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -181,6 +180,14 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
 
     def _tuning_server(self) -> SchedulerTuningHTTPServer:
         return cast("SchedulerTuningHTTPServer", self.server)
+
+    def _read_solve_request(self) -> tuple[FixtureEntry, str, HumanDailySolverConfig | None]:
+        payload = self._read_json_body()
+        fixture_id = str(payload.get("fixture_id", ""))
+        solver_name = str(payload.get("solver_name", self._tuning_server().state.default_solver))
+        raw_config = payload.get("config")
+        config_override = None if raw_config is None else human_daily_solver_config_from_dict(_mapping(raw_config))
+        return self._tuning_server().state.fixtures[fixture_id], solver_name, config_override
 
     def _read_json_body(self) -> Mapping[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
@@ -814,6 +821,7 @@ INDEX_HTML = """<!doctype html>
     const state = {
       config: {},
       defaultConfig: {},
+      fixtureConfig: {},
       schema: [],
       fixtures: [],
       visibility: "essential",
@@ -832,12 +840,12 @@ INDEX_HTML = """<!doctype html>
       state.fixtures = fixturesPayload.fixtures;
       state.defaultConfig = configPayload.config;
       state.config = { ...configPayload.config };
+      state.fixtureConfig = { ...configPayload.config };
       state.schema = configPayload.schema;
       renderFixtureSelect();
-      renderControls();
+      $("solverSelect").value = configPayload.default_solver;
       bindEvents();
-      updateYaml();
-      await runSolve();
+      await loadFixtureBaseline();
     }
 
     function renderFixtureSelect() {
@@ -883,13 +891,13 @@ INDEX_HTML = """<!doctype html>
     function bindEvents() {
       $("runButton").addEventListener("click", runSolve);
       $("resetButton").addEventListener("click", () => {
-        state.config = { ...state.defaultConfig };
+        state.config = { ...state.fixtureConfig };
         renderControls();
         bindControlEvents();
         updateYaml();
         runSolve();
       });
-      $("fixtureSelect").addEventListener("change", runSolve);
+      $("fixtureSelect").addEventListener("change", loadFixtureBaseline);
       $("solverSelect").addEventListener("change", runSolve);
       for (const button of document.querySelectorAll("[data-visibility]")) {
         button.addEventListener("click", (event) => {
@@ -910,6 +918,10 @@ INDEX_HTML = """<!doctype html>
         URL.revokeObjectURL(link.href);
       });
       bindControlEvents();
+    }
+
+    async function loadFixtureBaseline() {
+      await runSolve({ useFixtureConfig: true });
     }
 
     function renderVisibilityControls() {
@@ -938,21 +950,28 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
-    async function runSolve() {
+    async function runSolve(options = {}) {
       setBusy(true);
       try {
+        const useFixtureConfig = options.useFixtureConfig === true;
         const response = await fetch("/api/solve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fixture_id: $("fixtureSelect").value,
             solver_name: $("solverSelect").value,
-            config: state.config,
+            config: useFixtureConfig ? null : state.config,
           }),
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "solve failed");
         state.lastPayload = payload;
+        if (useFixtureConfig) {
+          state.fixtureConfig = { ...payload.config };
+          state.config = { ...payload.config };
+          renderControls();
+          bindControlEvents();
+        }
         $("yamlExport").value = payload.config_yaml;
         renderPayload(payload);
       } catch (error) {
