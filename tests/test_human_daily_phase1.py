@@ -8,7 +8,7 @@ import unittest
 from datetime import date, time
 from pathlib import Path
 
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     HumanDailyFixture,
     HumanDailySolverConfig,
     HumanFixedAssignment,
@@ -23,6 +23,7 @@ from scheduler.human import (
     human_flexible_daily_fixture_from_dict,
     load_human_daily_fixture,
     load_human_daily_solver_config,
+    plan_daily_schedule,
     run_human_daily_review,
     solve_human_daily_legacy,
     solve_human_daily_timeline,
@@ -55,6 +56,34 @@ class HumanDailyFixtureTests(unittest.TestCase):
             fixture.task_dependencies["logic_state_homodyne"],
             ["homodyne_distribution"],
         )
+
+    def test_public_plan_daily_schedule_accepts_mapping_and_config_override(self) -> None:
+        report = plan_daily_schedule(
+            {
+                "date": "2026-05-20",
+                "availability_windows": [
+                    {
+                        "start": "09:00",
+                        "end": "10:00",
+                        "work_kind": "focused_work",
+                    }
+                ],
+                "tasks": [
+                    {
+                        "id": "task",
+                        "title": "Focused task",
+                        "remaining_minutes": 30,
+                        "priority": 1,
+                        "work_kind": "focused_work",
+                    }
+                ],
+            },
+            solver_config={"kind_match_score": 20},
+        )
+
+        self.assertEqual(report.plan.status, "ok")
+        self.assertEqual(report.plan.blocks[0].task_id, "task")
+        self.assertEqual(report.config.kind_match_score, 20)
 
     def test_flexible_fixture_generates_slots_around_fixed_events_and_now(
         self,

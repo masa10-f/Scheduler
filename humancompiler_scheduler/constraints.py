@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from scheduler.model import Problem, Schedule, TimeWindow
+from humancompiler_scheduler.model import Problem, Schedule, TimeWindow
 
 
 @dataclass(frozen=True)

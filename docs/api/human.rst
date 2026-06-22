@@ -1,7 +1,7 @@
 Human Daily Scheduling API
 ==========================
 
-The ``scheduler.human`` namespace is experimental and intended for
+The ``humancompiler_scheduler.human`` namespace is experimental and intended for
 HumanCompiler-oriented daily scheduling adapters.
 
 See :doc:`human-solver-parameters` for detailed guidance on the tunable
@@ -10,34 +10,41 @@ See :doc:`human-solver-parameters` for detailed guidance on the tunable
 Package Exports
 ---------------
 
-.. automodule:: scheduler.human
+.. automodule:: humancompiler_scheduler.human
+   :members:
+   :undoc-members:
+
+Integration Entry Points
+------------------------
+
+.. automodule:: humancompiler_scheduler.human.api
    :members:
    :undoc-members:
 
 Models
 ------
 
-.. automodule:: scheduler.human.model
+.. automodule:: humancompiler_scheduler.human.model
    :members:
    :undoc-members:
 
 Solvers
 -------
 
-.. automodule:: scheduler.human.solver
+.. automodule:: humancompiler_scheduler.human.solver
    :members:
    :undoc-members:
 
 Reports
 -------
 
-.. automodule:: scheduler.human.report
+.. automodule:: humancompiler_scheduler.human.report
    :members:
    :undoc-members:
 
 YAML I/O
 --------
 
-.. automodule:: scheduler.human.io
+.. automodule:: humancompiler_scheduler.human.io
    :members:
    :undoc-members:

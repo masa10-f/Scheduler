@@ -2,7 +2,7 @@ Human Solver Parameters
 =======================
 
 ``HumanDailySolverConfig`` controls how the experimental
-``scheduler.human`` daily solvers score candidate task placements. These
+``humancompiler_scheduler.human`` daily solvers score candidate task placements. These
 parameters do not represent hard constraints by themselves. They change which
 valid candidate the greedy scoring logic prefers.
 

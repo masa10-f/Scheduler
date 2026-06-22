@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     compare_human_daily_solvers,
     format_human_daily_compact,
     format_human_daily_comparison,

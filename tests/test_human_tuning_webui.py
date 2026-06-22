@@ -18,7 +18,7 @@ from examples.human_tuning_webui import (
     create_tuning_payload,
     solver_config_to_dict,
 )
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     HumanDailySolverConfig,
     human_daily_solver_config_from_dict,
     load_human_daily_fixture,

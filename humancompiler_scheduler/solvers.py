@@ -8,13 +8,13 @@ from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
 
-from scheduler.constraints import (
+from humancompiler_scheduler.constraints import (
     Constraint,
     Violation,
     default_constraints,
     evaluate_constraints,
 )
-from scheduler.model import Assignment, Precedence, Problem, Schedule, Task
+from humancompiler_scheduler.model import Assignment, Precedence, Problem, Schedule, Task
 
 
 @dataclass

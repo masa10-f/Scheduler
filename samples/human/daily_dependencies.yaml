@@ -1,8 +1,8 @@
 date: "2025-09-18"
-task_database: data/taskagent_common_database.yaml
+task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_dependencies
-  purpose: shared TaskAgent database constrained to dependency-heavy FTQC/GKP work
+  purpose: shared HumanCompiler database constrained to dependency-heavy FTQC/GKP work
 
 time_slots:
   - index: 0

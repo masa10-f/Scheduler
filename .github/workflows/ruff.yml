@@ -25,6 +25,6 @@ jobs:
 
       - run: uv sync --locked --python 3.10 --group dev
 
-      - run: uv run --no-sync ruff check scheduler tests examples
+      - run: uv run --no-sync ruff check humancompiler_scheduler tests examples
 
       - run: uv run --no-sync ruff format --check --diff

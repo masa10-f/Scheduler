@@ -1474,7 +1474,7 @@ wheels = [
 ]
 
 [[package]]
-name = "taskagent-scheduler"
+name = "humancompiler-scheduler"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

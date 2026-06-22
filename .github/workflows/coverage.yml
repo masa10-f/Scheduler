@@ -28,4 +28,4 @@ jobs:
 
       - run: uv sync --locked --python 3.13 --group dev
 
-      - run: uv run --no-sync pytest -m "not cp_sat" --cov=scheduler --cov-report=term-missing --cov-report=xml --cov-branch
+      - run: uv run --no-sync pytest -m "not cp_sat" --cov=humancompiler_scheduler --cov-report=term-missing --cov-report=xml --cov-branch

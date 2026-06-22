@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     load_human_daily_solver_config,
     run_human_daily_review,
     write_human_daily_review,
