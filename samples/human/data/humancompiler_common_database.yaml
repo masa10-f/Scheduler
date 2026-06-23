@@ -1,0 +1,176 @@
+metadata:
+  name: humancompiler_common_database
+  source: synthetic_demo_fixture
+  note: >
+    Synthetic demo data for scheduler reviews. Task titles, identifiers,
+    priorities, dates, projects, and dependency shapes are invented for public
+    examples.
+
+task_dependencies:
+  project_brief_revision:
+    - project_brief_outline
+  launch_metrics_review:
+    - project_brief_revision
+  integration_plan:
+    - prototype_build
+    - vendor_shortlist
+  quality_review:
+    - prototype_build
+  dashboard_quality_check:
+    - quality_review
+  dashboard_release_check:
+    - dashboard_quality_check
+  interview_synthesis:
+    - user_interview_batch
+  literature_summary:
+    - research_notes
+
+tasks:
+  - id: backlog_cleanup
+    title: Clean up planning backlog labels
+    remaining_minutes: 90
+    priority: 1
+    work_kind: light_work
+    project_id: planning_ops
+    goal_id: weekly_planning
+  - id: project_brief_outline
+    title: Outline the project brief
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-06T17:00:00"
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: project_brief_revision
+    title: Revise the project brief
+    remaining_minutes: 90
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-19T17:00:00"
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: launch_metrics_review
+    title: Review launch readiness metrics
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-19T17:00:00"
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: vendor_shortlist
+    title: Compare vendor shortlist options
+    remaining_minutes: 150
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-09-20T17:00:00"
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: prototype_build
+    title: Build the prototype walkthrough
+    remaining_minutes: 150
+    priority: 2
+    work_kind: focused_work
+    due_at: "2025-09-27T17:00:00"
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: integration_plan
+    title: Draft the integration rollout plan
+    remaining_minutes: 120
+    priority: 4
+    work_kind: light_work
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: user_interview_batch
+    title: Prepare the user interview batch
+    remaining_minutes: 150
+    priority: 3
+    work_kind: focused_work
+    due_at: "2025-10-31T17:00:00"
+    project_id: product_demo
+    goal_id: user_research
+  - id: interview_synthesis
+    title: Synthesize user interview notes
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    due_at: "2025-10-31T17:00:00"
+    project_id: product_demo
+    goal_id: user_research
+  - id: documentation_appendix
+    title: Review the documentation appendix
+    remaining_minutes: 120
+    priority: 2
+    work_kind: focused_work
+    due_at: "2026-04-19T17:00:00"
+    project_id: docs_publish
+    goal_id: release_notes
+  - id: data_model_design
+    title: Design the demo data model
+    remaining_minutes: 120
+    priority: 2
+    work_kind: light_work
+    project_id: planning_ops
+    goal_id: data_cleanup
+  - id: tutorial_writing
+    title: Write the package tutorial
+    remaining_minutes: 120
+    priority: 3
+    work_kind: light_work
+    project_id: docs_publish
+    goal_id: public_release
+  - id: analytics_prototype
+    title: Build an analytics prototype
+    remaining_minutes: 100
+    priority: 3
+    work_kind: light_work
+    project_id: analytics_demo
+    goal_id: reporting_backend
+  - id: research_notes
+    title: Collect background research notes
+    remaining_minutes: 60
+    priority: 3
+    work_kind: study
+    project_id: research_demo
+    goal_id: literature_review
+  - id: literature_summary
+    title: Summarize the literature review
+    remaining_minutes: 30
+    priority: 3
+    work_kind: study
+    project_id: research_demo
+    goal_id: literature_review
+  - id: market_scan_reading
+    title: Read a market landscape report
+    remaining_minutes: 90
+    priority: 5
+    work_kind: study
+    project_id: research_demo
+    goal_id: market_scan
+  - id: automation_check
+    title: Verify automation trigger behavior
+    remaining_minutes: 120
+    priority: 4
+    work_kind: light_work
+    project_id: automation_demo
+    goal_id: workflow_checks
+  - id: quality_review
+    title: Review prototype quality signals
+    remaining_minutes: 90
+    priority: 3
+    work_kind: light_work
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: dashboard_quality_check
+    title: Check dashboard quality output
+    remaining_minutes: 120
+    priority: 3
+    work_kind: focused_work
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: dashboard_release_check
+    title: Check release dashboard output
+    remaining_minutes: 60
+    priority: 3
+    work_kind: focused_work
+    project_id: product_demo
+    goal_id: prototype_review

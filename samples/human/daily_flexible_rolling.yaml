@@ -1,6 +1,6 @@
 date: "2025-09-18"
 now: "2025-09-18T10:20:00"
-task_database: data/taskagent_common_database.yaml
+task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_flexible_rolling
   purpose: rolling reschedule trims past availability

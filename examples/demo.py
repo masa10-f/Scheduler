@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from scheduler import (
+from humancompiler_scheduler import (
     Schedule,
     Violation,
     default_constraints,

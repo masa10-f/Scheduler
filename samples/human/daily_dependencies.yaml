@@ -1,27 +1,27 @@
 date: "2025-09-18"
-task_database: data/taskagent_common_database.yaml
+task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_dependencies
-  purpose: shared TaskAgent database constrained to dependency-heavy FTQC/GKP work
+  purpose: synthetic HumanCompiler database constrained to dependency-heavy planning work
 
 time_slots:
   - index: 0
     start: "09:00"
     end: "10:30"
     work_kind: light_work
-    assigned_project_id: ftqc_resources
+    assigned_project_id: planning_ops
   - index: 1
     start: "11:00"
     end: "12:00"
     work_kind: study
-    assigned_project_id: ftqc_resources
+    assigned_project_id: planning_ops
   - index: 2
     start: "13:00"
     end: "15:00"
     work_kind: light_work
-    assigned_project_id: ftqc_resources
+    assigned_project_id: planning_ops
   - index: 3
     start: "15:30"
     end: "17:00"
     work_kind: study
-    assigned_project_id: ftqc_resources
+    assigned_project_id: planning_ops

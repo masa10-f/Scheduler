@@ -15,17 +15,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - uses: astral-sh/setup-uv@v8.2.0
         with:
-          uv-version: "0.11.16"
+          version: "0.11.23"
           enable-cache: true
 
-      - run: uv sync --locked --python 3.13 --group dev
+      - run: uv sync --locked --python 3.12 --group dev
 
-      - run: uv run --no-sync pytest -m "not cp_sat" --cov=scheduler --cov-report=term-missing --cov-report=xml --cov-branch
+      - run: uv run --no-sync pytest -m "not cp_sat" --cov=humancompiler_scheduler --cov-report=term-missing --cov-report=xml --cov-branch

@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from scheduler.model import Assignment, Precedence, Problem, Resource, Schedule, Task, TimeWindow
+from humancompiler_scheduler.model import Assignment, Precedence, Problem, Resource, Schedule, Task, TimeWindow
 
 
 def load_problem_yaml(path: str | Path) -> Problem:

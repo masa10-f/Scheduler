@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.12"]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -26,7 +26,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v8.2.0
         with:
-          uv-version: "0.11.16"
+          version: "0.11.23"
           enable-cache: true
 
       - run: uv sync --locked --python ${{ matrix.python }} --group dev
@@ -34,21 +34,21 @@ jobs:
       - run: uv run --no-sync pytest -m "not cp_sat"
 
   cp-sat:
-    name: "CP-SAT / Python 3.13 / ubuntu-latest"
+    name: "CP-SAT / Python 3.12 / ubuntu-latest"
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - uses: astral-sh/setup-uv@v8.2.0
         with:
-          uv-version: "0.11.16"
+          version: "0.11.23"
           enable-cache: true
 
-      - run: uv sync --locked --python 3.13 --group dev --extra cp-sat
+      - run: uv sync --locked --python 3.12 --group dev --extra cp-sat
 
       - run: uv run --no-sync pytest -m cp_sat

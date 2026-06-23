@@ -1,7 +1,7 @@
 Human Flexible Time Adapter
 ===========================
 
-The experimental ``scheduler.human`` daily planner accepts flexible daily
+The experimental ``humancompiler_scheduler.human`` daily planner accepts flexible daily
 fixtures in addition to hand-written ``time_slots``. Flexible fixtures describe
 the day as broad ``availability_windows``, hard ``fixed_events``, and an
 optional ``now`` timestamp. The adapter compiles that input into
@@ -31,7 +31,7 @@ Flexible fixtures can be loaded with the same helper used for fixed
 
 .. code-block:: python
 
-   from scheduler.human import load_human_daily_fixture, solve_human_daily_timeline
+   from humancompiler_scheduler.human import load_human_daily_fixture, solve_human_daily_timeline
 
    fixture = load_human_daily_fixture("samples/human/daily_flexible_normal.yaml")
    report = solve_human_daily_timeline(fixture)

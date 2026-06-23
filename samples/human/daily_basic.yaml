@@ -1,8 +1,8 @@
 date: "2025-09-18"
-task_database: data/taskagent_common_database.yaml
+task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_basic
-  purpose: baseline review using the shared TaskAgent task database
+  purpose: baseline review using the shared synthetic HumanCompiler task database
 
 solver_config:
   kind_match_score: 8

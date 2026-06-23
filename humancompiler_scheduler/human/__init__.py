@@ -1,5 +1,6 @@
 """Experimental HumanCompiler scheduling domain API."""
 
+from .api import HumanDailyConfigInput, HumanDailyInput, optimize_human_daily_schedule, plan_daily_schedule
 from .io import (
     compile_human_flexible_daily_fixture,
     human_daily_fixture_from_dict,
@@ -47,7 +48,9 @@ from .solver import (
 __all__ = [
     "HumanAvailabilityWindow",
     "HumanConstraintViolation",
+    "HumanDailyConfigInput",
     "HumanDailyFixture",
+    "HumanDailyInput",
     "HumanDailyPlan",
     "HumanDailySolverConfig",
     "HumanFixedAssignment",
@@ -74,6 +77,8 @@ __all__ = [
     "human_flexible_daily_fixture_from_dict",
     "load_human_daily_fixture",
     "load_human_daily_solver_config",
+    "optimize_human_daily_schedule",
+    "plan_daily_schedule",
     "run_human_daily_review",
     "solve_human_daily_legacy",
     "solve_human_daily_timeline",

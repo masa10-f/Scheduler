@@ -1,4 +1,4 @@
-"""Public API for the taskagent scheduler package."""
+"""Public API for the humancompiler scheduler package."""
 
 from .constraints import (
     Constraint,

@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     HumanDailyFixture,
     HumanDailySolverConfig,
     HumanSolverReport,

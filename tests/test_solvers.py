@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scheduler import Problem, Resource, Task, solve_cp_sat
+from humancompiler_scheduler import Problem, Resource, Task, solve_cp_sat
 
 
 @pytest.mark.cp_sat

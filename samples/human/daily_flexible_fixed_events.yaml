@@ -1,5 +1,5 @@
 date: "2025-09-18"
-task_database: data/taskagent_common_database.yaml
+task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_flexible_fixed_events
   purpose: lab reservation splits a broad afternoon window
@@ -13,6 +13,6 @@ availability_windows:
     work_kind: light_work
 
 fixed_events:
-  - title: Optical table reservation
+  - title: Workshop room reservation
     start: "15:00"
     end: "16:30"

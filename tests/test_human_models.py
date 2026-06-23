@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import time
 
-from scheduler.human import (
+from humancompiler_scheduler.human import (
     HumanAvailabilityWindow,
     HumanDailyPlan,
     HumanFixedAssignment,

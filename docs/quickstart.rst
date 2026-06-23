@@ -4,7 +4,13 @@ Quickstart
 Installation
 ------------
 
-Install the package from the repository root:
+Install the package from PyPI after the first release:
+
+.. code-block:: console
+
+   uv add humancompiler-scheduler
+
+Or install the package from the repository root:
 
 .. code-block:: console
 
@@ -30,7 +36,7 @@ discrete time slots.
 
 .. code-block:: python
 
-   from scheduler import Problem, Resource, Task, solve_greedy
+   from humancompiler_scheduler import Problem, Resource, Task, solve_greedy
 
    problem = Problem(
        tasks={
@@ -54,7 +60,7 @@ Use ``load_problem_yaml`` to load a scheduling problem from YAML:
 
 .. code-block:: python
 
-   from scheduler import load_problem_yaml, solve_greedy
+   from humancompiler_scheduler import load_problem_yaml, solve_greedy
 
    problem = load_problem_yaml("samples/sample.yaml")
    result = solve_greedy(problem)
@@ -62,17 +68,20 @@ Use ``load_problem_yaml`` to load a scheduling problem from YAML:
 Human Daily Scheduling
 ----------------------
 
-The ``scheduler.human`` namespace is experimental. It keeps HumanCompiler daily
+The ``humancompiler_scheduler.human`` namespace is experimental. It keeps HumanCompiler daily
 scheduling concepts separate from the generic solver API.
 
 .. code-block:: python
 
-   from scheduler.human import (
+   from humancompiler_scheduler.human import (
        compare_human_daily_solvers,
        format_human_daily_compact,
        load_human_daily_fixture,
+       plan_daily_schedule,
    )
 
    fixture = load_human_daily_fixture("samples/human/daily_basic.yaml")
+   report = plan_daily_schedule(fixture)
    comparison = compare_human_daily_solvers(fixture)
+   print(report.plan.status)
    print(format_human_daily_compact(comparison))

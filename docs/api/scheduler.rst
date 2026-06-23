@@ -4,34 +4,34 @@ Generic Scheduler API
 Package Exports
 ---------------
 
-.. automodule:: scheduler
+.. automodule:: humancompiler_scheduler
    :members:
    :undoc-members:
 
 Models
 ------
 
-.. automodule:: scheduler.model
+.. automodule:: humancompiler_scheduler.model
    :members:
    :undoc-members:
 
 Constraints
 -----------
 
-.. automodule:: scheduler.constraints
+.. automodule:: humancompiler_scheduler.constraints
    :members:
    :undoc-members:
 
 Solvers
 -------
 
-.. automodule:: scheduler.solvers
+.. automodule:: humancompiler_scheduler.solvers
    :members:
    :undoc-members:
 
 YAML I/O
 --------
 
-.. automodule:: scheduler.io
+.. automodule:: humancompiler_scheduler.io
    :members:
    :undoc-members:

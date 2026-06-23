@@ -1,9 +1,10 @@
-Scheduler Documentation
-=======================
+HumanCompiler Scheduler Documentation
+=====================================
 
-Scheduler is a small Python package for building and solving scheduling
-problems. It contains a generic task/resource solver API and an experimental
-``scheduler.human`` namespace for HumanCompiler-oriented daily scheduling.
+HumanCompiler Scheduler is a small Python package for HumanCompiler-oriented
+daily planning experiments. It contains a generic task/resource solver API and
+an experimental ``humancompiler_scheduler.human`` namespace for
+HumanCompiler-oriented daily scheduling.
 
 .. toctree::
    :maxdepth: 2
