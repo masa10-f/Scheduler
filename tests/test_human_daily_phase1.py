@@ -44,17 +44,17 @@ class HumanDailyFixtureTests(unittest.TestCase):
         self.assertGreaterEqual(len(fixture.tasks), 20)
         self.assertEqual(fixture.tasks[0].priority, 1)
         self.assertEqual(fixture.time_slots[0].work_kind.value, "focused_work")
-        self.assertIn("stim_erasure_compiler", fixture.task_dependencies)
+        self.assertIn("project_brief_revision", fixture.task_dependencies)
 
     def test_loads_tasks_from_relative_task_database(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
         task_ids = {task.id for task in fixture.tasks}
 
-        self.assertIn("surface_erasure_circuit", task_ids)
-        self.assertIn("logic_state_homodyne", fixture.task_dependencies)
+        self.assertIn("project_brief_outline", task_ids)
+        self.assertIn("literature_summary", fixture.task_dependencies)
         self.assertEqual(
-            fixture.task_dependencies["logic_state_homodyne"],
-            ["homodyne_distribution"],
+            fixture.task_dependencies["literature_summary"],
+            ["research_notes"],
         )
 
     def test_public_plan_daily_schedule_accepts_mapping_and_config_override(self) -> None:
@@ -472,9 +472,9 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         unscheduled = {item.task_id: item.reason for item in report.unscheduled_tasks}
         scheduled_ids = {block.task_id for block in report.plan.blocks}
 
-        self.assertIn("surface_erasure_circuit", scheduled_ids)
-        self.assertIn("stim_erasure_compiler", scheduled_ids)
-        self.assertEqual(unscheduled["mid_ir_sync_design"], "dependency_not_scheduled")
+        self.assertIn("project_brief_outline", scheduled_ids)
+        self.assertIn("project_brief_revision", scheduled_ids)
+        self.assertEqual(unscheduled["integration_plan"], "dependency_not_scheduled")
 
     def test_timeline_solver_waits_for_prerequisite_finish_time(self) -> None:
         fixture = HumanDailyFixture(

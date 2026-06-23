@@ -20,8 +20,8 @@ tasks:
     split_allowed: true
     min_chunk_minutes: 30
     preferred_chunk_minutes: 60
-  - id: optics_alignment
-    title: Optical alignment reservation prep
+  - id: workshop_prep
+    title: Workshop reservation prep
     remaining_minutes: 120
     priority: 2
     work_kind: focused_work

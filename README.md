@@ -88,7 +88,7 @@ Run a batch review and save a snapshot:
 uv run python examples/human_daily_review.py samples/human/*.yaml --format markdown --output human_daily_review.md
 ```
 
-The sample review fixtures share the same curated HumanCompiler task database
+The sample review fixtures share the same synthetic HumanCompiler task database
 at `samples/human/data/humancompiler_common_database.yaml`. The fixture files
 vary the available time windows and constraints, not the underlying task set.
 

@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renamed public package artifacts from legacy project naming to
   HumanCompiler-oriented naming before the first PyPI release.
+- Replaced review fixture task data with fully synthetic public demo data.
 - Declared support for Python `>=3.10, <3.15`.
 - Updated examples, tests, docs, and pre-commit hooks to use
   `humancompiler_scheduler`.

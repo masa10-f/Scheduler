@@ -1,176 +1,176 @@
 metadata:
   name: humancompiler_common_database
-  source: humancompiler_anonymized_export_2026-05-24.json
+  source: synthetic_demo_fixture
   note: >
-    Curated from production HumanCompiler data. Titles, priorities, work kinds, and
-    dependency shapes are preserved where useful; some estimates and work kinds
-    are adjusted so the fixtures produce readable daily scheduling reviews.
+    Synthetic demo data for scheduler reviews. Task titles, identifiers,
+    priorities, dates, projects, and dependency shapes are invented for public
+    examples.
 
 task_dependencies:
-  stim_erasure_compiler:
-    - surface_erasure_circuit
-  mbqc_erasure_logical_rate:
-    - stim_erasure_compiler
-  mid_ir_sync_design:
-    - optics_build
-    - camera_selection
-  visibility_qpi_eval:
-    - optics_build
-  odt_check:
-    - visibility_qpi_eval
-  mipodt_check:
-    - odt_check
-  psf_analysis:
-    - bead_odt_data
-  logic_state_homodyne:
-    - homodyne_distribution
+  project_brief_revision:
+    - project_brief_outline
+  launch_metrics_review:
+    - project_brief_revision
+  integration_plan:
+    - prototype_build
+    - vendor_shortlist
+  quality_review:
+    - prototype_build
+  dashboard_quality_check:
+    - quality_review
+  dashboard_release_check:
+    - dashboard_quality_check
+  interview_synthesis:
+    - user_interview_batch
+  literature_summary:
+    - research_notes
 
 tasks:
-  - id: fault_distance_edges
-    title: Implement fault-distance edge ordering
+  - id: backlog_cleanup
+    title: Clean up planning backlog labels
     remaining_minutes: 90
     priority: 1
     work_kind: light_work
-    project_id: ftqc_resources
-    goal_id: small_circuit_performance
-  - id: surface_erasure_circuit
-    title: Study surface-code erasure errors in circuits
+    project_id: planning_ops
+    goal_id: weekly_planning
+  - id: project_brief_outline
+    title: Outline the project brief
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
     due_at: "2025-09-06T17:00:00"
-    project_id: ftqc_resources
-    goal_id: erasure_error_simulation
-  - id: stim_erasure_compiler
-    title: Add erasure-error support to the Stim compiler
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: project_brief_revision
+    title: Revise the project brief
     remaining_minutes: 90
     priority: 3
     work_kind: light_work
     due_at: "2025-09-19T17:00:00"
-    project_id: ftqc_resources
-    goal_id: erasure_error_simulation
-  - id: mbqc_erasure_logical_rate
-    title: Evaluate MBQC logical error rates with erasures
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: launch_metrics_review
+    title: Review launch readiness metrics
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
     due_at: "2025-09-19T17:00:00"
-    project_id: ftqc_resources
-    goal_id: erasure_error_simulation
-  - id: camera_selection
-    title: Select a camera for video-rate MIP-ODT
+    project_id: planning_ops
+    goal_id: launch_brief
+  - id: vendor_shortlist
+    title: Compare vendor shortlist options
     remaining_minutes: 150
     priority: 3
     work_kind: light_work
     due_at: "2025-09-20T17:00:00"
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
-  - id: optics_build
-    title: Build the optical setup
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: prototype_build
+    title: Build the prototype walkthrough
     remaining_minutes: 150
     priority: 2
     work_kind: focused_work
     due_at: "2025-09-27T17:00:00"
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
-  - id: mid_ir_sync_design
-    title: Design synchronization including mid-infrared pulses
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: integration_plan
+    title: Draft the integration rollout plan
     remaining_minutes: 120
     priority: 4
     work_kind: light_work
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
-  - id: bead_odt_data
-    title: Capture 300 nm bead ODT data
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: user_interview_batch
+    title: Prepare the user interview batch
     remaining_minutes: 150
     priority: 3
     work_kind: focused_work
     due_at: "2025-10-31T17:00:00"
-    project_id: video_rate_mip_odt
-    goal_id: bead_resolution_eval
-  - id: psf_analysis
-    title: Analyze the PSF from bead data
+    project_id: product_demo
+    goal_id: user_research
+  - id: interview_synthesis
+    title: Synthesize user interview notes
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
     due_at: "2025-10-31T17:00:00"
-    project_id: video_rate_mip_odt
-    goal_id: bead_resolution_eval
-  - id: appendix_review
-    title: Review the paper appendix
+    project_id: product_demo
+    goal_id: user_research
+  - id: documentation_appendix
+    title: Review the documentation appendix
     remaining_minutes: 120
     priority: 2
     work_kind: focused_work
     due_at: "2026-04-19T17:00:00"
-    project_id: graph_qomb
-    goal_id: paper_writing
-  - id: rhgblock_design
-    title: Design the RHGBlock abstraction
+    project_id: docs_publish
+    goal_id: release_notes
+  - id: data_model_design
+    title: Design the demo data model
     remaining_minutes: 120
     priority: 2
     work_kind: light_work
-    project_id: ftqc_resources
-    goal_id: large_refactor
+    project_id: planning_ops
+    goal_id: data_cleanup
   - id: tutorial_writing
     title: Write the package tutorial
     remaining_minutes: 120
     priority: 3
     work_kind: light_work
-    project_id: graph_qomb
-    goal_id: pypi_release
-  - id: gkp_simulator_prototype
-    title: Build a GKP simulator prototype
+    project_id: docs_publish
+    goal_id: public_release
+  - id: analytics_prototype
+    title: Build an analytics prototype
     remaining_minutes: 100
     priority: 3
     work_kind: light_work
-    project_id: ftqc_resources
-    goal_id: gkp_simulation_backend
-  - id: homodyne_distribution
-    title: Derive homodyne distributions for general covariance matrices
+    project_id: analytics_demo
+    goal_id: reporting_backend
+  - id: research_notes
+    title: Collect background research notes
     remaining_minutes: 60
     priority: 3
     work_kind: study
-    project_id: ftqc_resources
-    goal_id: gkp_simulation_backend
-  - id: logic_state_homodyne
-    title: Derive homodyne distributions for stabilizer logical states
+    project_id: research_demo
+    goal_id: literature_review
+  - id: literature_summary
+    title: Summarize the literature review
     remaining_minutes: 30
     priority: 3
     work_kind: study
-    project_id: ftqc_resources
-    goal_id: gkp_simulation_backend
-  - id: srs_apod_reading
-    title: Read Super-resolution SRS microscopy with A-PoD
+    project_id: research_demo
+    goal_id: literature_review
+  - id: market_scan_reading
+    title: Read a market landscape report
     remaining_minutes: 90
     priority: 5
     work_kind: study
-    project_id: tunable_mip_odt
-    goal_id: lipid_imaging_literature
-  - id: dmd_trigger_check
-    title: Verify DMD behavior with trigger input
+    project_id: research_demo
+    goal_id: market_scan
+  - id: automation_check
+    title: Verify automation trigger behavior
     remaining_minutes: 120
     priority: 4
     work_kind: light_work
-    project_id: tunable_mip_odt
-    goal_id: dmd_dynamic_aperture
-  - id: visibility_qpi_eval
-    title: Evaluate visibility and QPI quality
+    project_id: automation_demo
+    goal_id: workflow_checks
+  - id: quality_review
+    title: Review prototype quality signals
     remaining_minutes: 90
     priority: 3
     work_kind: light_work
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
-  - id: odt_check
-    title: Check the ODT reconstruction
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: dashboard_quality_check
+    title: Check dashboard quality output
     remaining_minutes: 120
     priority: 3
     work_kind: focused_work
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
-  - id: mipodt_check
-    title: Check the MIP-ODT reconstruction
+    project_id: product_demo
+    goal_id: prototype_review
+  - id: dashboard_release_check
+    title: Check release dashboard output
     remaining_minutes: 60
     priority: 3
     work_kind: focused_work
-    project_id: video_rate_mip_odt
-    goal_id: dmd_video_rate_mip_odt
+    project_id: product_demo
+    goal_id: prototype_review

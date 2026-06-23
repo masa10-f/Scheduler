@@ -2,7 +2,7 @@ date: "2025-09-18"
 task_database: data/humancompiler_common_database.yaml
 metadata:
   name: daily_mixed_energy
-  purpose: shared HumanCompiler database with separate focus, light, and study windows
+  purpose: shared synthetic HumanCompiler database with separate focus, light, and study windows
 
 time_slots:
   - index: 0
@@ -23,6 +23,6 @@ time_slots:
     work_kind: light_work
 
 fixed_assignments:
-  - task_id: homodyne_distribution
+  - task_id: research_notes
     slot_index: 2
     duration_minutes: 60

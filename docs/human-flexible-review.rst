@@ -54,5 +54,5 @@ Next Checkpoint
 ---------------
 
 Before integrating the external package into HumanCompiler runtime behavior,
-export anonymized real HumanCompiler data into Scheduler fixture shape and run
-the same review command against those generated fixtures.
+export explicitly reviewed, non-sensitive HumanCompiler data into Scheduler
+fixture shape and run the same review command against those generated fixtures.
