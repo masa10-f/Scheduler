@@ -20,8 +20,13 @@ The v1 adapter is implemented. It:
 * preserves ``task_dependencies`` and ``solver_config``;
 * keeps existing fixtures with explicit ``time_slots`` unchanged.
 
-Task split policy fields are parsed and preserved on ``HumanTask``. The solver
-does not yet split one task into multiple scheduled blocks.
+The timeline solver treats ``remaining_minutes`` as total task backlog. It
+generates scheduler-level block-duration candidates for the current slot and
+scores those candidates with the same work-kind, priority, deadline,
+project-switch, continuous-work, and gap-fill rules used for task choice. Long
+tasks can therefore receive multiple blocks in one day when they remain the best
+candidate, but they are not considered complete until scheduled blocks cover the
+full ``remaining_minutes``.
 
 Usage
 -----
@@ -75,11 +80,12 @@ Input Model
   fixtures can contain index gaps when past slots are dropped.
 
 ``split_allowed`` and chunk fields
-  Task-level split policy. ``split_allowed``, ``min_chunk_minutes``, and
-  ``preferred_chunk_minutes`` are parsed and used by the timeline solver. A
-  split-enabled task can span multiple compatible generated slots when it does
-  not fit in the current slot, while non-splittable tasks still require one
-  slot large enough for the full remaining duration.
+  Task-level split policy fields are parsed for compatibility. The current
+  timeline solver emits one concrete block at a time from scheduler-level block
+  candidates. ``min_chunk_minutes`` overrides the scheduler's
+  ``min_block_minutes`` for that task, and ``preferred_chunk_minutes`` adds a
+  natural task-specific duration to the candidate set. It is not required for
+  long task backlog scheduling.
 
 Generated Slots
 ---------------
@@ -104,12 +110,18 @@ Scheduling Rules
 Current hard constraints:
 
 * fixed events and frozen past blocks cannot overlap scheduled work;
-* non-splittable tasks must fit in one generated interval;
-* split-enabled tasks can span generated intervals;
-* dependency order remains based on concrete block end times.
+* each emitted task block must fit in one generated interval;
+* dependency order remains based on concrete completion, not partial progress.
 
-* split chunks should be at least ``min_chunk_minutes``;
-* the solver prefers ``preferred_chunk_minutes`` when splitting long tasks.
+Candidate generation rules:
+
+* generated blocks use ``min_block_minutes``, ``block_granularity_minutes``, and
+  ``max_candidate_block_minutes`` from ``solver_config``;
+* task-level ``min_chunk_minutes`` can raise or lower the minimum block for one
+  task;
+* task-level ``preferred_chunk_minutes`` adds a preferred duration candidate;
+* long tasks are not considered complete unless scheduled blocks cover their
+  full ``remaining_minutes``.
 
 Soft preferences already handled by the timeline solver include:
 
@@ -129,15 +141,15 @@ The following review fixtures are included:
   late morning interruption;
 * ``samples/human/daily_flexible_fixed_events.yaml``: a day with a lab
   reservation that blocks a large afternoon interval;
-* ``samples/human/daily_flexible_split_policy.yaml``: a mixed day containing one
-  non-splittable task and several small splittable follow-ups.
+* ``samples/human/daily_flexible_split_policy.yaml``: a mixed day showing long
+  task backlog being cut into scored scheduler blocks while leaving room for
+  other work.
 
 Known Limitations
 -----------------
 
 The v1 adapter does not yet:
 
-* split a single task across multiple scheduled blocks;
 * preserve a previously scheduled plan as frozen timeline blocks;
 * model interruptibility for a currently running task.
 

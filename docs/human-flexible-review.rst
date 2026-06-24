@@ -27,9 +27,9 @@ The command completed successfully for all four flexible fixtures:
   dropped, but the review needs a clearer distinction between "lower score" and
   truly blocked dependency outcomes. This may need report/model wording before
   solver changes.
-* ``daily_flexible_split_policy``: 自然. Split policy fields produce repeated
-  timeline blocks for the same task across compatible generated slots, while
-  non-splittable work still needs a single slot large enough for the task.
+* ``daily_flexible_split_policy``: 自然. The solver cuts long backlog into
+  scored scheduler blocks, leaves room for other work, and keeps each emitted
+  block aligned with compatible generated slots.
 
 Tuning Versus Model Work
 ------------------------

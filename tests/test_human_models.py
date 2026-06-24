@@ -6,6 +6,7 @@ from datetime import time
 from humancompiler_scheduler.human import (
     HumanAvailabilityWindow,
     HumanDailyPlan,
+    HumanDailySolverConfig,
     HumanFixedAssignment,
     HumanFixedEvent,
     HumanScheduleBlock,
@@ -42,6 +43,16 @@ class HumanTaskTests(unittest.TestCase):
                 min_chunk_minutes=60,
                 preferred_chunk_minutes=30,
             )
+
+
+class HumanDailySolverConfigTests(unittest.TestCase):
+    def test_solver_config_rejects_invalid_block_candidate_settings(self) -> None:
+        with self.assertRaisesRegex(ValueError, "min_block_minutes"):
+            HumanDailySolverConfig(min_block_minutes=0)
+        with self.assertRaisesRegex(ValueError, "block_granularity_minutes"):
+            HumanDailySolverConfig(block_granularity_minutes=0)
+        with self.assertRaisesRegex(ValueError, "max_candidate_block_minutes"):
+            HumanDailySolverConfig(min_block_minutes=60, max_candidate_block_minutes=30)
 
 
 class HumanTimeSlotTests(unittest.TestCase):

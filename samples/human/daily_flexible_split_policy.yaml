@@ -1,7 +1,12 @@
 date: "2025-09-18"
 metadata:
   name: daily_flexible_split_policy
-  purpose: split policy fields allow one task to span generated slots
+  purpose: scheduler block candidates let long tasks contribute bounded work blocks
+
+solver_config:
+  min_block_minutes: 15
+  block_granularity_minutes: 15
+  max_candidate_block_minutes: 180
 
 availability_windows:
   - start: "09:00"

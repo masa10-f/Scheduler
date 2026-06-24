@@ -4,6 +4,7 @@ import json
 import threading
 import unittest
 from dataclasses import fields
+from datetime import date, time
 from pathlib import Path
 from urllib import request
 
@@ -16,12 +17,18 @@ from examples.human_tuning_webui import (
     config_schema,
     config_to_yaml,
     create_tuning_payload,
+    report_to_dict,
     solver_config_to_dict,
 )
 from humancompiler_scheduler.human import (
+    HumanDailyFixture,
     HumanDailySolverConfig,
+    HumanTask,
+    HumanTimeSlot,
+    HumanWorkKind,
     human_daily_solver_config_from_dict,
     load_human_daily_fixture,
+    solve_human_daily_timeline,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +72,9 @@ class HumanTuningWebUITest(unittest.TestCase):
     def test_solver_config_round_trips_as_yaml_payload(self) -> None:
         config = HumanDailySolverConfig(
             deadline_score=11,
+            min_block_minutes=10,
+            block_granularity_minutes=5,
+            max_candidate_block_minutes=90,
             project_switch_penalty=0,
             small_gap_fill_score=9,
         )
@@ -74,8 +84,44 @@ class HumanTuningWebUITest(unittest.TestCase):
 
         self.assertIn("solver_config:", yaml_text)
         self.assertIn("deadline_score: 11", yaml_text)
+        self.assertIn("min_block_minutes: 10", yaml_text)
+        self.assertIn("block_granularity_minutes: 5", yaml_text)
+        self.assertIn("max_candidate_block_minutes: 90", yaml_text)
         self.assertIn("project_switch_penalty: 0", yaml_text)
         self.assertIn("small_gap_fill_score: 9", yaml_text)
+
+    def test_report_payload_assigns_repeated_task_slot_scores_by_block_order(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
+                block_granularity_minutes=30,
+                max_candidate_block_minutes=90,
+                long_continuous_threshold_minutes=0,
+                small_gap_fill_score=10,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="backlog",
+                    title="Backlog",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        payload = report_to_dict(fixture, solve_human_daily_timeline(fixture))
+
+        self.assertEqual([block["score"] for block in payload["blocks"]], [13, 23])
 
     def test_http_api_solve_smoke(self) -> None:
         registry = build_fixture_registry([DAILY_BASIC], repo_root=REPO_ROOT)

@@ -184,6 +184,9 @@ class HumanDailySolverConfig:
     overdue_score: int = 20
     fixed_assignment_score: int = 100
     dependency_unlock_score: int = 3
+    min_block_minutes: int = 15
+    block_granularity_minutes: int = 15
+    max_candidate_block_minutes: int = 180
     project_switch_penalty: int = 4
     project_switch_reset_gap_minutes: int = 30
     long_continuous_threshold_minutes: int = 120
@@ -209,6 +212,14 @@ class HumanDailySolverConfig:
             raise ValueError("fixed_assignment_score must be non-negative")
         if self.dependency_unlock_score < 0:
             raise ValueError("dependency_unlock_score must be non-negative")
+        if self.min_block_minutes <= 0:
+            raise ValueError("min_block_minutes must be positive")
+        if self.block_granularity_minutes <= 0:
+            raise ValueError("block_granularity_minutes must be positive")
+        if self.max_candidate_block_minutes <= 0:
+            raise ValueError("max_candidate_block_minutes must be positive")
+        if self.max_candidate_block_minutes < self.min_block_minutes:
+            raise ValueError("max_candidate_block_minutes must be at least min_block_minutes")
         if self.project_switch_penalty < 0:
             raise ValueError("project_switch_penalty must be non-negative")
         if self.project_switch_reset_gap_minutes < 0:

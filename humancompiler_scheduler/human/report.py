@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import asdict
 
 from .model import (
     HumanDailyFixture,
+    HumanScheduleBlock,
     HumanScoreBreakdown,
     HumanSolverComparison,
     HumanSolverReport,
@@ -54,7 +56,8 @@ def _format_compact_timeline(fixture: HumanDailyFixture, report: HumanSolverRepo
 
     tasks_by_id = {task.id: task for task in fixture.tasks}
     slot_kinds = {slot.index: slot.work_kind.value for slot in fixture.time_slots}
-    score_by_task_slot = {(score.task_id, score.slot_index): score for score in report.score_breakdown}
+    score_queues = _score_queues_by_task_slot(report)
+    scheduled_minutes_by_task = _scheduled_minutes_by_task(report)
     lines = [
         "  time         kind     score  task                            notes",
         "  -----------  -------  -----  ------------------------------  -------------------",
@@ -62,15 +65,16 @@ def _format_compact_timeline(fixture: HumanDailyFixture, report: HumanSolverRepo
     for block in report.plan.blocks:
         task = tasks_by_id.get(block.task_id)
         title = task.title if task else block.task_id
-        score = score_by_task_slot.get((block.task_id, block.slot_index))
+        score = _pop_score_for_block(block, score_queues)
         score_text = str(score.total) if score else "-"
+        is_partial = bool(task and scheduled_minutes_by_task.get(block.task_id, 0) < task.remaining_minutes)
         lines.append(
             "  "
             f"{block.start.strftime('%H:%M')}-{block.end.strftime('%H:%M')}  "
             f"{_short_kind(slot_kinds.get(block.slot_index, 'unknown')):<7}  "
             f"{score_text:>5}  "
             f"{_truncate(title, 30):<30}  "
-            f"{_compact_notes(block.is_fixed, score)}"
+            f"{_compact_notes(block.is_fixed, score, is_partial=is_partial)}"
         )
     return lines
 
@@ -88,8 +92,10 @@ def _format_compact_unscheduled(report: HumanSolverReport) -> list[str]:
 
 def _format_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> list[str]:
     task_titles = {task.id: task.title for task in fixture.tasks}
+    tasks_by_id = {task.id: task for task in fixture.tasks}
     slot_kinds = {slot.index: slot.work_kind.value for slot in fixture.time_slots}
-    score_by_task_slot = {(score.task_id, score.slot_index): score for score in report.score_breakdown}
+    score_queues = _score_queues_by_task_slot(report)
+    scheduled_minutes_by_task = _scheduled_minutes_by_task(report)
 
     lines = [
         f"== {report.solver_name} ==",
@@ -101,13 +107,17 @@ def _format_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> lis
         for block in report.plan.blocks:
             title = task_titles.get(block.task_id, block.task_id)
             fixed = " fixed" if block.is_fixed else ""
-            score = score_by_task_slot.get((block.task_id, block.slot_index))
+            score = _pop_score_for_block(block, score_queues)
             score_text = f" score={score.total}" if score else ""
+            task = tasks_by_id.get(block.task_id)
+            partial_text = ""
+            if task and scheduled_minutes_by_task.get(block.task_id, 0) < task.remaining_minutes:
+                partial_text = f" partial={scheduled_minutes_by_task[block.task_id]}/{task.remaining_minutes}"
             lines.append(
                 "  - "
                 f"{block.start.strftime('%H:%M')}-{block.end.strftime('%H:%M')} "
                 f"slot={block.slot_index} kind={slot_kinds.get(block.slot_index, 'unknown')} "
-                f"task={block.task_id} title={title!r}{fixed}{score_text}"
+                f"task={block.task_id} title={title!r}{fixed}{score_text}{partial_text}"
             )
     else:
         lines.append("  none")
@@ -146,10 +156,38 @@ def _format_config(report: HumanSolverReport) -> str:
     return ", ".join(f"{key}={value}" for key, value in data.items())
 
 
-def _compact_notes(is_fixed: bool, score: HumanScoreBreakdown | None) -> str:
+def _scheduled_minutes_by_task(report: HumanSolverReport) -> dict[str, int]:
+    scheduled_minutes: dict[str, int] = {}
+    for block in report.plan.blocks:
+        scheduled_minutes[block.task_id] = scheduled_minutes.get(block.task_id, 0) + block.duration_minutes
+    return scheduled_minutes
+
+
+def _score_queues_by_task_slot(
+    report: HumanSolverReport,
+) -> dict[tuple[str, int], deque[HumanScoreBreakdown]]:
+    score_queues: dict[tuple[str, int], deque[HumanScoreBreakdown]] = {}
+    for score in report.score_breakdown:
+        score_queues.setdefault((score.task_id, score.slot_index), deque()).append(score)
+    return score_queues
+
+
+def _pop_score_for_block(
+    block: HumanScheduleBlock,
+    score_queues: dict[tuple[str, int], deque[HumanScoreBreakdown]],
+) -> HumanScoreBreakdown | None:
+    queue = score_queues.get((block.task_id, block.slot_index))
+    if not queue:
+        return None
+    return queue.popleft()
+
+
+def _compact_notes(is_fixed: bool, score: HumanScoreBreakdown | None, *, is_partial: bool) -> str:
     notes: list[str] = []
     if is_fixed:
         notes.append("fixed")
+    if is_partial:
+        notes.append("partial")
     if score is None:
         return " ".join(notes) or "-"
 

@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added timeline solver support for `split_allowed` tasks to span compatible
-  generated slots while respecting `min_chunk_minutes` and preferring
-  `preferred_chunk_minutes`.
+- Added timeline solver block-duration candidates so long `remaining_minutes`
+  values are scheduled as scored work blocks instead of all-or-nothing tasks.
+- Added scheduler-level `min_block_minutes`, `block_granularity_minutes`, and
+  `max_candidate_block_minutes` controls for block candidate generation.
 
 ## [0.1.0] - 2026-06-22
 
