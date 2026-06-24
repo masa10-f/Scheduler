@@ -590,6 +590,81 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
             [("09:00", "11:00"), ("13:00", "15:00")],
         )
 
+    def test_split_chunk_scores_reflect_intervening_timeline_blocks(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                project_switch_penalty=10,
+                project_switch_reset_gap_minutes=31,
+                long_continuous_threshold_minutes=120,
+                long_continuous_penalty=8,
+                break_reset_gap_minutes=31,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="alpha",
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(10, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="beta",
+                ),
+                HumanTimeSlot(
+                    index=2,
+                    start=time(10, 30),
+                    end=time(11, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="alpha",
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="split_alpha",
+                    title="Split alpha work",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                    split_allowed=True,
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=60,
+                ),
+                HumanTask(
+                    id="beta_interruption",
+                    title="Beta interruption",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="beta",
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(
+            [
+                (block.task_id, block.start.strftime("%H:%M"), block.end.strftime("%H:%M"))
+                for block in report.plan.blocks
+            ],
+            [
+                ("split_alpha", "09:00", "10:00"),
+                ("beta_interruption", "10:00", "10:30"),
+                ("split_alpha", "10:30", "11:30"),
+            ],
+        )
+        later_split_score = next(
+            score for score in report.score_breakdown if score.task_id == "split_alpha" and score.slot_index == 2
+        )
+        self.assertEqual(later_split_score.components["project_switch"], -10)
+        self.assertEqual(later_split_score.components["continuous_work"], -8)
+
     def test_dependencies_block_tasks_without_prerequisites(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
         report = compare_human_daily_solvers(fixture).reports["timeline_greedy"]
