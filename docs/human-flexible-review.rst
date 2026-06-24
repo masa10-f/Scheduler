@@ -27,10 +27,9 @@ The command completed successfully for all four flexible fixtures:
   dropped, but the review needs a clearer distinction between "lower score" and
   truly blocked dependency outcomes. This may need report/model wording before
   solver changes.
-* ``daily_flexible_split_policy``: 自然 for v1. Split policy fields are parsed
-  and preserved, and the solver keeps one block per task as documented. The
-  next solver phase should implement actual task splitting before using this as
-  real operational behavior.
+* ``daily_flexible_split_policy``: 自然. Split policy fields produce repeated
+  timeline blocks for the same task across compatible generated slots, while
+  non-splittable work still needs a single slot large enough for the task.
 
 Tuning Versus Model Work
 ------------------------
@@ -47,8 +46,6 @@ Model/report candidates:
 * Add clearer unscheduled reasons for score-based omissions.
 * Preserve previously scheduled historical blocks before full rolling
   reschedule support.
-* Implement actual split behavior for ``split_allowed`` tasks, respecting
-  ``min_chunk_minutes`` and ``preferred_chunk_minutes``.
 
 Next Checkpoint
 ---------------

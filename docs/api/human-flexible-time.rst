@@ -76,9 +76,10 @@ Input Model
 
 ``split_allowed`` and chunk fields
   Task-level split policy. ``split_allowed``, ``min_chunk_minutes``, and
-  ``preferred_chunk_minutes`` are parsed and preserved for future solver
-  behavior. The current timeline solver still schedules each task as a single
-  block.
+  ``preferred_chunk_minutes`` are parsed and used by the timeline solver. A
+  split-enabled task can span multiple compatible generated slots when it does
+  not fit in the current slot, while non-splittable tasks still require one
+  slot large enough for the full remaining duration.
 
 Generated Slots
 ---------------
@@ -93,9 +94,9 @@ calling the existing solvers:
 * emit generated ``HumanTimeSlot`` values ordered by start time;
 * keep ``task_dependencies`` and ``solver_config`` unchanged.
 
-For v1, generated slots can be coarse intervals split only by fixed events and
-``now``. Fine-grained task splitting can follow after review fixtures show that
-the broad time model behaves naturally.
+Generated slots can be coarse intervals split by fixed events and ``now``.
+Split-enabled tasks may produce multiple scheduled blocks across those generated
+slots.
 
 Scheduling Rules
 ----------------
@@ -103,15 +104,12 @@ Scheduling Rules
 Current hard constraints:
 
 * fixed events and frozen past blocks cannot overlap scheduled work;
-* tasks must fit in one generated interval;
+* non-splittable tasks must fit in one generated interval;
+* split-enabled tasks can span generated intervals;
 * dependency order remains based on concrete block end times.
 
-Future splitting rules:
-
-* non-splittable tasks should stay in one generated interval;
 * split chunks should be at least ``min_chunk_minutes``;
-* the solver should prefer ``preferred_chunk_minutes`` when splitting long
-  tasks.
+* the solver prefers ``preferred_chunk_minutes`` when splitting long tasks.
 
 Soft preferences already handled by the timeline solver include:
 

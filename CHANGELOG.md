@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added timeline solver support for `split_allowed` tasks to span compatible
+  generated slots while respecting `min_chunk_minutes` and preferring
+  `preferred_chunk_minutes`.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added

@@ -465,6 +465,131 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertGreaterEqual(len(slot_zero_starts), 2)
         self.assertEqual(len(slot_zero_starts), len(set(slot_zero_starts)))
 
+    def test_timeline_solver_splits_task_across_compatible_slots(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(15, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="split_task",
+                    title="Split task",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    split_allowed=True,
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=120,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(
+            [
+                (
+                    block.task_id,
+                    block.slot_index,
+                    block.start.strftime("%H:%M"),
+                    block.end.strftime("%H:%M"),
+                    block.duration_minutes,
+                )
+                for block in report.plan.blocks
+            ],
+            [
+                ("split_task", 0, "09:00", "11:00", 120),
+                ("split_task", 1, "13:00", "15:00", 120),
+            ],
+        )
+
+    def test_timeline_solver_keeps_non_splittable_task_unscheduled_without_single_slot(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(15, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="whole_task",
+                    title="Whole task",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    split_allowed=False,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks, [])
+        self.assertEqual(report.unscheduled_tasks[0].task_id, "whole_task")
+        self.assertEqual(report.unscheduled_tasks[0].reason, "task_longer_than_any_slot")
+
+    def test_timeline_solver_prefers_configured_chunk_size_when_splitting(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(15, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="preferred_split",
+                    title="Preferred split",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    split_allowed=True,
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=120,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual([block.duration_minutes for block in report.plan.blocks], [120, 120])
+        self.assertEqual(
+            [(block.start.strftime("%H:%M"), block.end.strftime("%H:%M")) for block in report.plan.blocks],
+            [("09:00", "11:00"), ("13:00", "15:00")],
+        )
+
     def test_dependencies_block_tasks_without_prerequisites(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
         report = compare_human_daily_solvers(fixture).reports["timeline_greedy"]

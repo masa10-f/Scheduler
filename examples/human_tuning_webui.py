@@ -298,7 +298,7 @@ def fixture_to_dict(fixture_entry: FixtureEntry, fixture: HumanDailyFixture) -> 
 def report_to_dict(fixture: HumanDailyFixture, report: HumanSolverReport) -> dict[str, Any]:
     tasks_by_id = {task.id: task for task in fixture.tasks}
     slots_by_index = {slot.index: slot for slot in fixture.time_slots}
-    score_by_task = {score.task_id: score for score in report.score_breakdown}
+    score_by_task_slot = {(score.task_id, score.slot_index): score for score in report.score_breakdown}
     return {
         "solver_name": report.solver_name,
         "status": report.plan.status,
@@ -316,8 +316,12 @@ def report_to_dict(fixture: HumanDailyFixture, report: HumanSolverReport) -> dic
                 "end": block.end.strftime("%H:%M"),
                 "duration_minutes": block.duration_minutes,
                 "is_fixed": block.is_fixed,
-                "score": score_by_task[block.task_id].total if block.task_id in score_by_task else None,
-                "components": score_by_task[block.task_id].components if block.task_id in score_by_task else {},
+                "score": score_by_task_slot[block.task_id, block.slot_index].total
+                if (block.task_id, block.slot_index) in score_by_task_slot
+                else None,
+                "components": score_by_task_slot[block.task_id, block.slot_index].components
+                if (block.task_id, block.slot_index) in score_by_task_slot
+                else {},
             }
             for block in report.plan.blocks
         ],

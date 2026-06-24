@@ -54,7 +54,7 @@ def _format_compact_timeline(fixture: HumanDailyFixture, report: HumanSolverRepo
 
     tasks_by_id = {task.id: task for task in fixture.tasks}
     slot_kinds = {slot.index: slot.work_kind.value for slot in fixture.time_slots}
-    score_by_task = {score.task_id: score for score in report.score_breakdown}
+    score_by_task_slot = {(score.task_id, score.slot_index): score for score in report.score_breakdown}
     lines = [
         "  time         kind     score  task                            notes",
         "  -----------  -------  -----  ------------------------------  -------------------",
@@ -62,7 +62,7 @@ def _format_compact_timeline(fixture: HumanDailyFixture, report: HumanSolverRepo
     for block in report.plan.blocks:
         task = tasks_by_id.get(block.task_id)
         title = task.title if task else block.task_id
-        score = score_by_task.get(block.task_id)
+        score = score_by_task_slot.get((block.task_id, block.slot_index))
         score_text = str(score.total) if score else "-"
         lines.append(
             "  "
@@ -89,7 +89,7 @@ def _format_compact_unscheduled(report: HumanSolverReport) -> list[str]:
 def _format_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> list[str]:
     task_titles = {task.id: task.title for task in fixture.tasks}
     slot_kinds = {slot.index: slot.work_kind.value for slot in fixture.time_slots}
-    score_by_task = {score.task_id: score for score in report.score_breakdown}
+    score_by_task_slot = {(score.task_id, score.slot_index): score for score in report.score_breakdown}
 
     lines = [
         f"== {report.solver_name} ==",
@@ -101,7 +101,7 @@ def _format_report(fixture: HumanDailyFixture, report: HumanSolverReport) -> lis
         for block in report.plan.blocks:
             title = task_titles.get(block.task_id, block.task_id)
             fixed = " fixed" if block.is_fixed else ""
-            score = score_by_task.get(block.task_id)
+            score = score_by_task_slot.get((block.task_id, block.slot_index))
             score_text = f" score={score.total}" if score else ""
             lines.append(
                 "  - "
