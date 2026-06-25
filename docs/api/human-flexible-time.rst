@@ -20,8 +20,12 @@ The v1 adapter is implemented. It:
 * preserves ``task_dependencies`` and ``solver_config``;
 * keeps existing fixtures with explicit ``time_slots`` unchanged.
 
-Task split policy fields are parsed and preserved on ``HumanTask``. The solver
-does not yet split one task into multiple scheduled blocks.
+The timeline solver treats ``remaining_minutes`` as available task backlog for
+planning. It generates scheduler-level block-duration candidates for the current
+slot and scores those candidates with the same work-kind, priority, deadline,
+project-switch, continuous-work, and gap-fill rules used for task choice. Long
+tasks can therefore receive one or more work blocks in the day when they remain
+good candidates.
 
 Usage
 -----
@@ -74,11 +78,11 @@ Input Model
   blocks. Slot indexes are assigned before ``now`` filtering, so rolling
   fixtures can contain index gaps when past slots are dropped.
 
-``split_allowed`` and chunk fields
-  Task-level split policy. ``split_allowed``, ``min_chunk_minutes``, and
-  ``preferred_chunk_minutes`` are parsed and preserved for future solver
-  behavior. The current timeline solver still schedules each task as a single
-  block.
+Chunk sizing fields
+  The timeline solver emits one concrete block at a time from scheduler-level
+  block candidates. ``min_chunk_minutes`` overrides the scheduler's
+  ``min_block_minutes`` for that task, and ``preferred_chunk_minutes`` adds a
+  natural task-specific duration to the candidate set.
 
 Generated Slots
 ---------------
@@ -93,9 +97,8 @@ calling the existing solvers:
 * emit generated ``HumanTimeSlot`` values ordered by start time;
 * keep ``task_dependencies`` and ``solver_config`` unchanged.
 
-For v1, generated slots can be coarse intervals split only by fixed events and
-``now``. Fine-grained task splitting can follow after review fixtures show that
-the broad time model behaves naturally.
+Generated slots can be coarse intervals split by fixed events and ``now``.
+Tasks may produce multiple scheduled blocks across those generated slots.
 
 Scheduling Rules
 ----------------
@@ -103,15 +106,20 @@ Scheduling Rules
 Current hard constraints:
 
 * fixed events and frozen past blocks cannot overlap scheduled work;
-* tasks must fit in one generated interval;
-* dependency order remains based on concrete block end times.
+* each emitted task block must fit in one generated interval;
+* dependency order is evaluated from the blocks in the generated plan, so a
+  dependent task waits until its prerequisites have enough planned work blocks
+  ahead of it.
 
-Future splitting rules:
+Candidate generation rules:
 
-* non-splittable tasks should stay in one generated interval;
-* split chunks should be at least ``min_chunk_minutes``;
-* the solver should prefer ``preferred_chunk_minutes`` when splitting long
-  tasks.
+* generated blocks use ``min_block_minutes``, ``block_granularity_minutes``, and
+  ``max_candidate_block_minutes`` from ``solver_config``;
+* task-level ``min_chunk_minutes`` can raise or lower the minimum block for one
+  task;
+* task-level ``preferred_chunk_minutes`` adds a preferred duration candidate;
+* long tasks can contribute bounded blocks without needing to occupy every
+  available minute in the day.
 
 Soft preferences already handled by the timeline solver include:
 
@@ -131,15 +139,15 @@ The following review fixtures are included:
   late morning interruption;
 * ``samples/human/daily_flexible_fixed_events.yaml``: a day with a lab
   reservation that blocks a large afternoon interval;
-* ``samples/human/daily_flexible_split_policy.yaml``: a mixed day containing one
-  non-splittable task and several small splittable follow-ups.
+* ``samples/human/daily_flexible_block_candidates.yaml``: a mixed day showing
+  long task backlog being cut into scored scheduler blocks while leaving room
+  for other work.
 
 Known Limitations
 -----------------
 
 The v1 adapter does not yet:
 
-* split a single task across multiple scheduled blocks;
 * preserve a previously scheduled plan as frozen timeline blocks;
 * model interruptibility for a currently running task.
 

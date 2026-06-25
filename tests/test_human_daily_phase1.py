@@ -19,6 +19,7 @@ from humancompiler_scheduler.human import (
     compile_human_flexible_daily_fixture,
     format_human_daily_compact,
     format_human_daily_comparison,
+    format_human_daily_report,
     human_daily_fixture_from_dict,
     human_flexible_daily_fixture_from_dict,
     load_human_daily_fixture,
@@ -314,7 +315,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
         self.assertEqual(report.plan.blocks[0].task_id, "fixed_task")
         self.assertEqual(report.plan.blocks[0].slot_index, 1)
 
-    def test_flexible_fixture_keeps_task_split_policy(self) -> None:
+    def test_flexible_fixture_keeps_task_chunk_policy(self) -> None:
         flexible = human_flexible_daily_fixture_from_dict(
             {
                 "date": "2026-05-20",
@@ -331,7 +332,6 @@ class HumanDailyFixtureTests(unittest.TestCase):
                         "title": "Task",
                         "remaining_minutes": 90,
                         "work_kind": "focused_work",
-                        "split_allowed": True,
                         "min_chunk_minutes": 30,
                         "preferred_chunk_minutes": 60,
                     }
@@ -341,36 +341,11 @@ class HumanDailyFixtureTests(unittest.TestCase):
 
         fixture = compile_human_flexible_daily_fixture(flexible)
 
-        self.assertTrue(fixture.tasks[0].split_allowed)
         self.assertEqual(fixture.tasks[0].min_chunk_minutes, 30)
         self.assertEqual(fixture.tasks[0].preferred_chunk_minutes, 60)
 
-    def test_flexible_fixture_parses_string_false_split_policy(self) -> None:
-        fixture = human_daily_fixture_from_dict(
-            {
-                "date": "2026-05-20",
-                "availability_windows": [
-                    {
-                        "start": "09:00",
-                        "end": "12:00",
-                        "work_kind": "focused_work",
-                    }
-                ],
-                "tasks": [
-                    {
-                        "id": "task",
-                        "title": "Task",
-                        "remaining_minutes": 90,
-                        "split_allowed": "false",
-                    }
-                ],
-            }
-        )
-
-        self.assertFalse(fixture.tasks[0].split_allowed)
-
-    def test_flexible_fixture_rejects_invalid_split_policy_boolean(self) -> None:
-        with self.assertRaisesRegex(ValueError, "invalid boolean"):
+    def test_flexible_fixture_rejects_invalid_chunk_policy(self) -> None:
+        with self.assertRaisesRegex(ValueError, "preferred_chunk_minutes"):
             human_daily_fixture_from_dict(
                 {
                     "date": "2026-05-20",
@@ -386,7 +361,8 @@ class HumanDailyFixtureTests(unittest.TestCase):
                             "id": "task",
                             "title": "Task",
                             "remaining_minutes": 90,
-                            "split_allowed": "sometimes",
+                            "min_chunk_minutes": 60,
+                            "preferred_chunk_minutes": 30,
                         }
                     ],
                 }
@@ -419,8 +395,35 @@ class HumanDailyFixtureTests(unittest.TestCase):
 
 class HumanDailySolverComparisonTests(unittest.TestCase):
     def test_legacy_solver_exposes_duplicate_slot_start_limitation(self) -> None:
-        fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")
-        report = compare_human_daily_solvers(fixture).reports["legacy_slot"]
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(max_candidate_block_minutes=30),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="first",
+                    title="First",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="second",
+                    title="Second",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+        report = solve_human_daily_legacy(fixture)
 
         starts_by_slot: dict[int, list[str]] = {}
         for block in report.plan.blocks:
@@ -464,6 +467,363 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(slot_zero_starts), 2)
         self.assertEqual(len(slot_zero_starts), len(set(slot_zero_starts)))
+
+    def test_timeline_solver_splits_task_across_compatible_slots(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(14, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="split_task",
+                    title="Split task",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=120,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(
+            [
+                (
+                    block.task_id,
+                    block.slot_index,
+                    block.start.strftime("%H:%M"),
+                    block.end.strftime("%H:%M"),
+                    block.duration_minutes,
+                )
+                for block in report.plan.blocks
+            ],
+            [
+                ("split_task", 0, "09:00", "10:00", 60),
+                ("split_task", 1, "13:00", "14:00", 60),
+            ],
+        )
+
+    def test_timeline_solver_can_schedule_long_task_multiple_times_per_day(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(15, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="whole_task",
+                    title="Whole task",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(
+            [(block.task_id, block.duration_minutes) for block in report.plan.blocks],
+            [("whole_task", 120), ("whole_task", 120)],
+        )
+
+    def test_timeline_solver_continues_long_task_without_completing_dependency(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(14, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            task_dependencies={"dependent": ["large_task"]},
+            tasks=[
+                HumanTask(
+                    id="large_task",
+                    title="Large task",
+                    remaining_minutes=20 * 60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent",
+                    remaining_minutes=60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(
+            [(block.task_id, block.duration_minutes) for block in report.plan.blocks],
+            [("large_task", 120), ("large_task", 60), ("large_task", 60)],
+        )
+        self.assertEqual(report.unscheduled_tasks[0].task_id, "dependent")
+        self.assertEqual(report.unscheduled_tasks[0].reason, "dependency_not_scheduled")
+
+    def test_timeline_solver_starts_with_preferred_chunk_size_when_available(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(13, 0),
+                    end=time(15, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="preferred_split",
+                    title="Preferred split",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=120,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[0].duration_minutes, 120)
+        self.assertEqual(
+            (report.plan.blocks[0].start.strftime("%H:%M"), report.plan.blocks[0].end.strftime("%H:%M")),
+            ("09:00", "11:00"),
+        )
+
+    def test_timeline_solver_prefers_configured_chunk_size_on_score_ties(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
+                block_granularity_minutes=30,
+                max_candidate_block_minutes=180,
+                long_continuous_threshold_minutes=0,
+                small_gap_fill_score=0,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="preferred_chunk",
+                    title="Preferred chunk",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    min_chunk_minutes=30,
+                    preferred_chunk_minutes=60,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[0].duration_minutes, 60)
+
+    def test_timeline_solver_uses_configured_block_cap_and_granularity(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
+                block_granularity_minutes=30,
+                max_candidate_block_minutes=90,
+                long_continuous_threshold_minutes=0,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="backlog",
+                    title="Backlog task",
+                    remaining_minutes=20 * 60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual([block.duration_minutes for block in report.plan.blocks], [90, 90])
+
+    def test_timeline_solver_scores_kind_mismatch_instead_of_deferring_to_future_match(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(11, 0),
+                    end=time(11, 15),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="focused_backlog",
+                    title="Focused backlog",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(
+            [
+                (
+                    block.task_id,
+                    block.slot_index,
+                    block.start.strftime("%H:%M"),
+                    block.end.strftime("%H:%M"),
+                    block.duration_minutes,
+                )
+                for block in report.plan.blocks
+            ],
+            [("focused_backlog", 0, "09:00", "11:00", 120)],
+        )
+        score = report.score_breakdown[0]
+        self.assertEqual(score.components["kind"], fixture.solver_config.kind_mismatch_score)
+
+    def test_split_chunk_scores_reflect_intervening_timeline_blocks(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                project_switch_penalty=10,
+                project_switch_reset_gap_minutes=31,
+                long_continuous_threshold_minutes=120,
+                long_continuous_penalty=8,
+                break_reset_gap_minutes=31,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(10, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="alpha",
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(10, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="beta",
+                ),
+                HumanTimeSlot(
+                    index=2,
+                    start=time(10, 30),
+                    end=time(11, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    assigned_project_id="alpha",
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="split_alpha",
+                    title="Split alpha work",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="alpha",
+                    min_chunk_minutes=60,
+                    preferred_chunk_minutes=120,
+                ),
+                HumanTask(
+                    id="beta_interruption",
+                    title="Beta interruption",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    project_id="beta",
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(
+            [
+                (block.task_id, block.start.strftime("%H:%M"), block.end.strftime("%H:%M"))
+                for block in report.plan.blocks
+            ],
+            [
+                ("split_alpha", "09:00", "10:00"),
+                ("beta_interruption", "10:00", "10:30"),
+                ("split_alpha", "10:30", "11:30"),
+            ],
+        )
+        later_split_score = next(
+            score for score in report.score_breakdown if score.task_id == "split_alpha" and score.slot_index == 2
+        )
+        self.assertEqual(later_split_score.components["project_switch"], -10)
+        self.assertEqual(later_split_score.components["continuous_work"], -8)
 
     def test_dependencies_block_tasks_without_prerequisites(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_dependencies.yaml")
@@ -518,6 +878,67 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         scheduled_ids = {block.task_id for block in report.plan.blocks}
         self.assertNotIn("dependent", scheduled_ids)
         self.assertEqual(report.violations, [])
+
+    def test_dependency_violation_checks_early_partial_dependent_block(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(9, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(10, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=2,
+                    start=time(11, 0),
+                    end=time(11, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="dependent", slot_index=0, duration_minutes=30),
+                HumanFixedAssignment(task_id="prerequisite", slot_index=1, duration_minutes=30),
+            ],
+            task_dependencies={"dependent": ["prerequisite"]},
+            tasks=[
+                HumanTask(
+                    id="prerequisite",
+                    title="Prerequisite",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent",
+                    remaining_minutes=60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(
+            [(block.task_id, block.start.strftime("%H:%M")) for block in report.plan.blocks],
+            [
+                ("dependent", "09:00"),
+                ("prerequisite", "10:00"),
+                ("dependent", "11:00"),
+            ],
+        )
+        self.assertEqual(
+            [(violation.code, violation.task_id, violation.slot_index) for violation in report.violations],
+            [("dependency_order", "dependent", 0)],
+        )
 
     def test_legacy_dependency_checks_use_slot_start_time(self) -> None:
         fixture = HumanDailyFixture(
@@ -741,6 +1162,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         fixture = HumanDailyFixture(
             date=date(2026, 5, 20),
             solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
                 long_continuous_threshold_minutes=120,
                 long_continuous_penalty=8,
             ),
@@ -788,6 +1210,7 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         fixture = HumanDailyFixture(
             date=date(2026, 5, 20),
             solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
                 break_reset_gap_minutes=0,
                 long_continuous_threshold_minutes=120,
                 long_continuous_penalty=8,
@@ -893,6 +1316,9 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                 ],
                 "solver_config": {
                     "dependency_unlock_score": 7,
+                    "min_block_minutes": 10,
+                    "block_granularity_minutes": 5,
+                    "max_candidate_block_minutes": 90,
                     "project_switch_penalty": 8,
                     "project_switch_reset_gap_minutes": 45,
                     "long_continuous_threshold_minutes": 150,
@@ -905,6 +1331,9 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         )
 
         self.assertEqual(fixture.solver_config.dependency_unlock_score, 7)
+        self.assertEqual(fixture.solver_config.min_block_minutes, 10)
+        self.assertEqual(fixture.solver_config.block_granularity_minutes, 5)
+        self.assertEqual(fixture.solver_config.max_candidate_block_minutes, 90)
         self.assertEqual(fixture.solver_config.project_switch_penalty, 8)
         self.assertEqual(fixture.solver_config.project_switch_reset_gap_minutes, 45)
         self.assertEqual(fixture.solver_config.long_continuous_threshold_minutes, 150)
@@ -924,6 +1353,41 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertIn("score breakdown:", output)
         self.assertIn("constraint violations:", output)
         self.assertIn("solver settings:", output)
+
+    def test_report_assigns_repeated_task_slot_scores_by_block_order(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
+                block_granularity_minutes=30,
+                max_candidate_block_minutes=90,
+                long_continuous_threshold_minutes=0,
+                small_gap_fill_score=10,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="backlog",
+                    title="Backlog",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+        output = format_human_daily_report(fixture, report)
+
+        self.assertIn("09:00-10:30 slot=0 kind=focused_work task=backlog title='Backlog' score=13", output)
+        self.assertIn("10:30-11:00 slot=0 kind=focused_work task=backlog title='Backlog' score=23", output)
 
     def test_compact_report_keeps_terminal_output_short(self) -> None:
         fixture = load_human_daily_fixture(SAMPLES_DIR / "daily_basic.yaml")

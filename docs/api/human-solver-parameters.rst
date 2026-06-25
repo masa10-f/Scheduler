@@ -71,6 +71,24 @@ Parameter Summary
      - Integer ``>= 0``
      - Added for each downstream task that becomes unblocked when the current task is scheduled.
      - Increase when prerequisite tasks should be scheduled earlier to unlock follow-up work. Lower when dependency unlocking should not outweigh priority or deadline pressure.
+   * - ``min_block_minutes``
+     - ``15``
+     - Minutes
+     - Integer ``> 0``
+     - Smallest scheduler-generated block unless the task has less remaining work. Task-level ``min_chunk_minutes`` overrides this value.
+     - Raise when tiny task fragments are not useful. Lower when short leftover gaps should be usable.
+   * - ``block_granularity_minutes``
+     - ``15``
+     - Minutes
+     - Integer ``> 0``
+     - Step size used when generating candidate block durations between the minimum and maximum.
+     - Lower for finer packing choices. Raise to reduce candidate count and make block lengths more regular.
+   * - ``max_candidate_block_minutes``
+     - ``180``
+     - Minutes
+     - Integer ``>= min_block_minutes``
+     - Largest duration considered for one greedy placement. Long tasks can still receive multiple blocks as the solver advances through the day.
+     - Lower when one placement should not dominate a slot. Raise when larger uninterrupted sessions should be considered.
    * - ``project_switch_penalty``
      - ``4``
      - Score points
@@ -130,6 +148,10 @@ Use these rules of thumb:
   ``overdue_score``. If future deadlines are pulled too early, reduce
   ``deadline_soon_days``.
 * If prerequisite work is delayed, increase ``dependency_unlock_score``.
+* If long backlog tasks consume too much of the day, lower
+  ``max_candidate_block_minutes`` or increase ``long_continuous_penalty``.
+* If task fragments are too small or too irregular, raise
+  ``min_block_minutes`` or ``block_granularity_minutes``.
 * If the plan jumps between projects too often, increase
   ``project_switch_penalty`` or ``project_switch_reset_gap_minutes``.
 * If the plan creates long uninterrupted work runs, lower
@@ -179,6 +201,9 @@ Example YAML
      overdue_score: 20
      fixed_assignment_score: 100
      dependency_unlock_score: 5
+     min_block_minutes: 15
+     block_granularity_minutes: 15
+     max_candidate_block_minutes: 180
      project_switch_penalty: 6
      project_switch_reset_gap_minutes: 45
      long_continuous_threshold_minutes: 90

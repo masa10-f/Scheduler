@@ -69,7 +69,6 @@ review tooling and experiments.
 
 The `0.1.0` release intentionally keeps the solver compact. It does not yet:
 
-- split one task across multiple scheduled blocks;
 - insert break blocks automatically;
 - preserve prior scheduled blocks or model current-task interruptibility for
   full rolling reschedule.

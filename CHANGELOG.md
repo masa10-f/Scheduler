@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added timeline solver block-duration candidates so long `remaining_minutes`
+  values are scheduled as scored work blocks instead of all-or-nothing tasks.
+- Added scheduler-level `min_block_minutes`, `block_granularity_minutes`, and
+  `max_candidate_block_minutes` controls for block candidate generation.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added
@@ -39,8 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known Limitations
 
-- Task splitting fields are parsed and preserved, but the solver still schedules
-  each task as a single block.
+- Long tasks are scheduled as a single block when one compatible slot has enough
+  capacity; bounded multi-block placement is not available in the 0.1.0 release.
 - Breaks are only represented when passed as fixed events; automatic break
   insertion is not implemented yet.
 - Rolling reschedule trims future availability with `now`, but frozen prior

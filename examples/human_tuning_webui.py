@@ -5,6 +5,7 @@ import argparse
 import json
 import threading
 import webbrowser
+from collections import deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, replace
 from http import HTTPStatus
@@ -19,6 +20,8 @@ import yaml
 from humancompiler_scheduler.human import (
     HumanDailyFixture,
     HumanDailySolverConfig,
+    HumanScheduleBlock,
+    HumanScoreBreakdown,
     HumanSolverReport,
     compare_human_daily_solvers,
     human_daily_solver_config_from_dict,
@@ -68,6 +71,36 @@ CONFIG_CONTROLS: tuple[ConfigControl, ...] = (
     ConfigControl("overdue_score", "Overdue score", "Priority", 0, 80, visibility="tuning"),
     ConfigControl("fixed_assignment_score", "Fixed assignment", "Hard hints", 0, 200),
     ConfigControl("dependency_unlock_score", "Dependency unlock", "Hard hints", 0, 30, visibility="tuning"),
+    ConfigControl(
+        "min_block_minutes",
+        "Min block",
+        "Packing",
+        1,
+        120,
+        5,
+        visibility="essential",
+        help="Smallest scheduler-generated block unless the task has less remaining work.",
+    ),
+    ConfigControl(
+        "block_granularity_minutes",
+        "Block granularity",
+        "Packing",
+        1,
+        60,
+        5,
+        visibility="tuning",
+        help="Minute step used when generating candidate block durations.",
+    ),
+    ConfigControl(
+        "max_candidate_block_minutes",
+        "Max candidate block",
+        "Packing",
+        15,
+        480,
+        15,
+        visibility="essential",
+        help="Largest block duration considered for one greedy placement.",
+    ),
     ConfigControl("project_switch_penalty", "Project switch", "Flow", 0, 30, visibility="essential"),
     ConfigControl("project_switch_reset_gap_minutes", "Switch reset gap", "Flow", 0, 180, 5),
     ConfigControl("long_continuous_threshold_minutes", "Long work threshold", "Flow", 0, 360, 5, visibility="tuning"),
@@ -298,13 +331,16 @@ def fixture_to_dict(fixture_entry: FixtureEntry, fixture: HumanDailyFixture) -> 
 def report_to_dict(fixture: HumanDailyFixture, report: HumanSolverReport) -> dict[str, Any]:
     tasks_by_id = {task.id: task for task in fixture.tasks}
     slots_by_index = {slot.index: slot for slot in fixture.time_slots}
-    score_by_task = {score.task_id: score for score in report.score_breakdown}
-    return {
-        "solver_name": report.solver_name,
-        "status": report.plan.status,
-        "scheduled_count": len(report.plan.blocks),
-        "unscheduled_count": len(report.unscheduled_tasks),
-        "blocks": [
+    score_queues = score_queues_by_task_slot(report)
+    scheduled_minutes_by_task: dict[str, int] = {}
+    for block in report.plan.blocks:
+        scheduled_minutes_by_task[block.task_id] = (
+            scheduled_minutes_by_task.get(block.task_id, 0) + block.duration_minutes
+        )
+    block_items: list[dict[str, Any]] = []
+    for block in report.plan.blocks:
+        score = pop_score_for_block(block, score_queues)
+        block_items.append(
             {
                 "task_id": block.task_id,
                 "title": tasks_by_id[block.task_id].title if block.task_id in tasks_by_id else block.task_id,
@@ -315,12 +351,25 @@ def report_to_dict(fixture: HumanDailyFixture, report: HumanSolverReport) -> dic
                 "start": block.start.strftime("%H:%M"),
                 "end": block.end.strftime("%H:%M"),
                 "duration_minutes": block.duration_minutes,
+                "task_remaining_minutes": tasks_by_id[block.task_id].remaining_minutes
+                if block.task_id in tasks_by_id
+                else None,
+                "task_scheduled_minutes": scheduled_minutes_by_task.get(block.task_id, block.duration_minutes),
+                "is_partial_task": (
+                    block.task_id in tasks_by_id
+                    and scheduled_minutes_by_task.get(block.task_id, 0) < tasks_by_id[block.task_id].remaining_minutes
+                ),
                 "is_fixed": block.is_fixed,
-                "score": score_by_task[block.task_id].total if block.task_id in score_by_task else None,
-                "components": score_by_task[block.task_id].components if block.task_id in score_by_task else {},
+                "score": score.total if score else None,
+                "components": score.components if score else {},
             }
-            for block in report.plan.blocks
-        ],
+        )
+    return {
+        "solver_name": report.solver_name,
+        "status": report.plan.status,
+        "scheduled_count": len(report.plan.blocks),
+        "unscheduled_count": len(report.unscheduled_tasks),
+        "blocks": block_items,
         "unscheduled": [
             {"task_id": task.task_id, "title": task.title, "reason": task.reason} for task in report.unscheduled_tasks
         ],
@@ -344,6 +393,25 @@ def report_to_dict(fixture: HumanDailyFixture, report: HumanSolverReport) -> dic
             for score in report.score_breakdown
         ],
     }
+
+
+def score_queues_by_task_slot(
+    report: HumanSolverReport,
+) -> dict[tuple[str, int], deque[HumanScoreBreakdown]]:
+    score_queues: dict[tuple[str, int], deque[HumanScoreBreakdown]] = {}
+    for score in report.score_breakdown:
+        score_queues.setdefault((score.task_id, score.slot_index), deque()).append(score)
+    return score_queues
+
+
+def pop_score_for_block(
+    block: HumanScheduleBlock,
+    score_queues: dict[tuple[str, int], deque[HumanScoreBreakdown]],
+) -> HumanScoreBreakdown | None:
+    queue = score_queues.get((block.task_id, block.slot_index))
+    if not queue:
+        return None
+    return queue.popleft()
 
 
 def fixture_entry_to_dict(entry: FixtureEntry) -> dict[str, str]:
@@ -1015,7 +1083,7 @@ INDEX_HTML = """<!doctype html>
           <div class="time">${escapeHtml(block.start)}-${escapeHtml(block.end)}</div>
           <div>
             <div class="task-title">${escapeHtml(block.title)}</div>
-            <div class="subtitle">${escapeHtml(block.task_id)} / ${escapeHtml(block.slot_kind)} / ${block.duration_minutes} min</div>
+            <div class="subtitle">${escapeHtml(block.task_id)} / ${escapeHtml(block.slot_kind)} / ${block.is_partial_task ? `${block.task_scheduled_minutes}/${block.task_remaining_minutes}` : block.duration_minutes} min</div>
           </div>
           <span class="pill">${block.score ?? "-"}</span>
         </div>
