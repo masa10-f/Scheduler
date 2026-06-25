@@ -315,7 +315,7 @@ class HumanDailyFixtureTests(unittest.TestCase):
         self.assertEqual(report.plan.blocks[0].task_id, "fixed_task")
         self.assertEqual(report.plan.blocks[0].slot_index, 1)
 
-    def test_flexible_fixture_keeps_task_split_policy(self) -> None:
+    def test_flexible_fixture_keeps_task_chunk_policy(self) -> None:
         flexible = human_flexible_daily_fixture_from_dict(
             {
                 "date": "2026-05-20",
@@ -332,7 +332,6 @@ class HumanDailyFixtureTests(unittest.TestCase):
                         "title": "Task",
                         "remaining_minutes": 90,
                         "work_kind": "focused_work",
-                        "split_allowed": True,
                         "min_chunk_minutes": 30,
                         "preferred_chunk_minutes": 60,
                     }
@@ -342,36 +341,11 @@ class HumanDailyFixtureTests(unittest.TestCase):
 
         fixture = compile_human_flexible_daily_fixture(flexible)
 
-        self.assertTrue(fixture.tasks[0].split_allowed)
         self.assertEqual(fixture.tasks[0].min_chunk_minutes, 30)
         self.assertEqual(fixture.tasks[0].preferred_chunk_minutes, 60)
 
-    def test_flexible_fixture_parses_string_false_split_policy(self) -> None:
-        fixture = human_daily_fixture_from_dict(
-            {
-                "date": "2026-05-20",
-                "availability_windows": [
-                    {
-                        "start": "09:00",
-                        "end": "12:00",
-                        "work_kind": "focused_work",
-                    }
-                ],
-                "tasks": [
-                    {
-                        "id": "task",
-                        "title": "Task",
-                        "remaining_minutes": 90,
-                        "split_allowed": "false",
-                    }
-                ],
-            }
-        )
-
-        self.assertFalse(fixture.tasks[0].split_allowed)
-
-    def test_flexible_fixture_rejects_invalid_split_policy_boolean(self) -> None:
-        with self.assertRaisesRegex(ValueError, "invalid boolean"):
+    def test_flexible_fixture_rejects_invalid_chunk_policy(self) -> None:
+        with self.assertRaisesRegex(ValueError, "preferred_chunk_minutes"):
             human_daily_fixture_from_dict(
                 {
                     "date": "2026-05-20",
@@ -387,7 +361,8 @@ class HumanDailyFixtureTests(unittest.TestCase):
                             "id": "task",
                             "title": "Task",
                             "remaining_minutes": 90,
-                            "split_allowed": "sometimes",
+                            "min_chunk_minutes": 60,
+                            "preferred_chunk_minutes": 30,
                         }
                     ],
                 }
@@ -517,7 +492,6 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     remaining_minutes=240,
                     priority=1,
                     work_kind=HumanWorkKind.FOCUSED_WORK,
-                    split_allowed=True,
                     min_chunk_minutes=60,
                     preferred_chunk_minutes=120,
                 )
@@ -568,7 +542,6 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     remaining_minutes=240,
                     priority=1,
                     work_kind=HumanWorkKind.FOCUSED_WORK,
-                    split_allowed=False,
                 )
             ],
         )
@@ -650,7 +623,6 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     remaining_minutes=240,
                     priority=1,
                     work_kind=HumanWorkKind.FOCUSED_WORK,
-                    split_allowed=True,
                     min_chunk_minutes=60,
                     preferred_chunk_minutes=120,
                 )
@@ -664,6 +636,41 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
             (report.plan.blocks[0].start.strftime("%H:%M"), report.plan.blocks[0].end.strftime("%H:%M")),
             ("09:00", "11:00"),
         )
+
+    def test_timeline_solver_prefers_configured_chunk_size_on_score_ties(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            solver_config=HumanDailySolverConfig(
+                min_block_minutes=30,
+                block_granularity_minutes=30,
+                max_candidate_block_minutes=180,
+                long_continuous_threshold_minutes=0,
+                small_gap_fill_score=0,
+            ),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(12, 0),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+            tasks=[
+                HumanTask(
+                    id="preferred_chunk",
+                    title="Preferred chunk",
+                    remaining_minutes=240,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                    min_chunk_minutes=30,
+                    preferred_chunk_minutes=60,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.plan.blocks[0].duration_minutes, 60)
 
     def test_timeline_solver_uses_configured_block_cap_and_granularity(self) -> None:
         fixture = HumanDailyFixture(
@@ -785,7 +792,6 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
                     priority=1,
                     work_kind=HumanWorkKind.FOCUSED_WORK,
                     project_id="alpha",
-                    split_allowed=True,
                     min_chunk_minutes=60,
                     preferred_chunk_minutes=120,
                 ),

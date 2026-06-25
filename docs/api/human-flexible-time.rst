@@ -78,10 +78,9 @@ Input Model
   blocks. Slot indexes are assigned before ``now`` filtering, so rolling
   fixtures can contain index gaps when past slots are dropped.
 
-``split_allowed`` and chunk fields
-  Task-level split policy fields are parsed for compatibility. The current
-  timeline solver emits one concrete block at a time from scheduler-level block
-  candidates. ``min_chunk_minutes`` overrides the scheduler's
+Chunk sizing fields
+  The timeline solver emits one concrete block at a time from scheduler-level
+  block candidates. ``min_chunk_minutes`` overrides the scheduler's
   ``min_block_minutes`` for that task, and ``preferred_chunk_minutes`` adds a
   natural task-specific duration to the candidate set.
 
@@ -140,9 +139,9 @@ The following review fixtures are included:
   late morning interruption;
 * ``samples/human/daily_flexible_fixed_events.yaml``: a day with a lab
   reservation that blocks a large afternoon interval;
-* ``samples/human/daily_flexible_split_policy.yaml``: a mixed day showing long
-  task backlog being cut into scored scheduler blocks while leaving room for
-  other work.
+* ``samples/human/daily_flexible_block_candidates.yaml``: a mixed day showing
+  long task backlog being cut into scored scheduler blocks while leaving room
+  for other work.
 
 Known Limitations
 -----------------

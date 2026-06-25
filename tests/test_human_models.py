@@ -33,13 +33,12 @@ class HumanTaskTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "priority"):
             HumanTask(id="task-1", title="Invalid", remaining_minutes=30, priority=6)
 
-    def test_task_rejects_invalid_split_policy(self) -> None:
+    def test_task_rejects_invalid_chunk_policy(self) -> None:
         with self.assertRaisesRegex(ValueError, "preferred_chunk_minutes"):
             HumanTask(
                 id="task-1",
-                title="Invalid split",
+                title="Invalid chunk",
                 remaining_minutes=90,
-                split_allowed=True,
                 min_chunk_minutes=60,
                 preferred_chunk_minutes=30,
             )

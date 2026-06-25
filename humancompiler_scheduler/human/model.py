@@ -36,7 +36,6 @@ class HumanTask:
     project_id: str | None = None
     goal_id: str | None = None
     source: HumanTaskSource = "task"
-    split_allowed: bool = False
     min_chunk_minutes: int | None = None
     preferred_chunk_minutes: int | None = None
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)

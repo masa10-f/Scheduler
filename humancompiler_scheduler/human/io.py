@@ -136,7 +136,6 @@ def _parse_tasks(raw: Any) -> list[HumanTask]:
                 project_id=_optional_str(task.get("project_id")),
                 goal_id=_optional_str(task.get("goal_id")),
                 source=_parse_task_source(task.get("source", "task")),
-                split_allowed=_parse_bool(task.get("split_allowed", False)),
                 min_chunk_minutes=(
                     int(task["min_chunk_minutes"]) if task.get("min_chunk_minutes") is not None else None
                 ),
@@ -378,18 +377,6 @@ def _parse_time(raw: Any) -> time:
     if isinstance(raw, time):
         return raw
     return time.fromisoformat(str(raw))
-
-
-def _parse_bool(raw: Any) -> bool:
-    if isinstance(raw, bool):
-        return raw
-    if isinstance(raw, str):
-        value = raw.lower()
-        if value in {"true", "yes", "1"}:
-            return True
-        if value in {"false", "no", "0"}:
-            return False
-    raise ValueError(f"invalid boolean value: {raw}")
 
 
 def _minutes(value: time) -> int:

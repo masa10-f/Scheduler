@@ -586,16 +586,23 @@ def _task_can_schedule_block(
 
 def _timeline_candidate_key(
     candidate: _TimelineCandidate,
-) -> tuple[int, int, int, int, str]:
+) -> tuple[int, int, int, int, int, str]:
     task = candidate.task
     due_key = -1_000_000_000 if task.due_at is None else -task.due_at.toordinal()
     return (
         candidate.score.total,
         due_key,
         -task.priority,
+        _preferred_chunk_key(task, candidate.chunk.duration_minutes),
         candidate.chunk.duration_minutes,
         task.id,
     )
+
+
+def _preferred_chunk_key(task: HumanTask, duration_minutes: int) -> int:
+    if task.preferred_chunk_minutes is None:
+        return 0
+    return -abs(duration_minutes - task.preferred_chunk_minutes)
 
 
 def _legacy_candidate_key(
