@@ -697,6 +697,53 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
 
         self.assertEqual([block.duration_minutes for block in report.plan.blocks], [90, 90])
 
+    def test_timeline_solver_scores_kind_mismatch_instead_of_deferring_to_future_match(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(11, 0),
+                    work_kind=HumanWorkKind.LIGHT_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(11, 0),
+                    end=time(11, 15),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            tasks=[
+                HumanTask(
+                    id="focused_backlog",
+                    title="Focused backlog",
+                    remaining_minutes=120,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                )
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(report.unscheduled_tasks, [])
+        self.assertEqual(
+            [
+                (
+                    block.task_id,
+                    block.slot_index,
+                    block.start.strftime("%H:%M"),
+                    block.end.strftime("%H:%M"),
+                    block.duration_minutes,
+                )
+                for block in report.plan.blocks
+            ],
+            [("focused_backlog", 0, "09:00", "11:00", 120)],
+        )
+        score = report.score_breakdown[0]
+        self.assertEqual(score.components["kind"], fixture.solver_config.kind_mismatch_score)
+
     def test_split_chunk_scores_reflect_intervening_timeline_blocks(self) -> None:
         fixture = HumanDailyFixture(
             date=date(2026, 5, 20),

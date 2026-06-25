@@ -250,8 +250,7 @@ def _fill_timeline_slots(
     unscheduled: dict[str, str],
 ) -> None:
     tasks_by_id = {task.id: task for task in fixture.tasks}
-    for slot_position, slot in enumerate(sorted_slots):
-        future_slots = sorted_slots[slot_position + 1 :]
+    for slot in sorted_slots:
         while True:
             candidate_start = slot_cursors[slot.index]
             if slot.effective_capacity_minutes - slot_usage[slot.index] <= 0:
@@ -259,7 +258,6 @@ def _fill_timeline_slots(
             candidates = _timeline_candidates(
                 fixture,
                 slot,
-                future_slots,
                 completed,
                 scheduled_blocks,
                 scheduled_minutes,
@@ -395,7 +393,6 @@ def _can_use_slot(task: HumanTask, slot: HumanTimeSlot) -> bool:
 def _timeline_candidates(
     fixture: HumanDailyFixture,
     slot: HumanTimeSlot,
-    future_slots: list[HumanTimeSlot],
     completed: dict[str, HumanScheduleBlock],
     scheduled_blocks: list[HumanScheduleBlock],
     scheduled_minutes: dict[str, int],
@@ -416,16 +413,6 @@ def _timeline_candidates(
         if not _dependencies_finish_by(task.id, fixture, completed, candidate_start):
             continue
         if not _can_use_slot(task, slot):
-            continue
-        if _should_defer_for_future_kind_match(
-            task,
-            slot,
-            future_slots,
-            scheduled_minutes,
-            slot_usage,
-            fixture.date,
-            fixture.solver_config,
-        ):
             continue
         chunks = _timeline_chunks_for_slot(
             task,
@@ -557,35 +544,6 @@ def _place_timeline_candidate(
     slot_usage[chunk.slot.index] += chunk.duration_minutes
     slot_cursors[chunk.slot.index] = end_minutes
     return block
-
-
-def _should_defer_for_future_kind_match(
-    task: HumanTask,
-    slot: HumanTimeSlot,
-    future_slots: list[HumanTimeSlot],
-    scheduled_minutes: dict[str, int],
-    slot_usage: dict[int, int],
-    schedule_date: date,
-    config: HumanDailySolverConfig,
-) -> bool:
-    if task.work_kind == slot.work_kind:
-        return False
-    if _deadline_score(task, schedule_date, config) > 0:
-        return False
-    remaining_minutes = _remaining_task_minutes(task, scheduled_minutes.get(task.id, 0))
-    return any(
-        _can_use_slot(task, future_slot)
-        and task.work_kind == future_slot.work_kind
-        and bool(
-            _block_duration_candidates(
-                task,
-                config,
-                remaining_minutes=remaining_minutes,
-                available_minutes=future_slot.effective_capacity_minutes - slot_usage[future_slot.index],
-            )
-        )
-        for future_slot in future_slots
-    )
 
 
 def _unscheduled_reason(

@@ -20,13 +20,12 @@ The v1 adapter is implemented. It:
 * preserves ``task_dependencies`` and ``solver_config``;
 * keeps existing fixtures with explicit ``time_slots`` unchanged.
 
-The timeline solver treats ``remaining_minutes`` as total task backlog. It
-generates scheduler-level block-duration candidates for the current slot and
-scores those candidates with the same work-kind, priority, deadline,
+The timeline solver treats ``remaining_minutes`` as available task backlog for
+planning. It generates scheduler-level block-duration candidates for the current
+slot and scores those candidates with the same work-kind, priority, deadline,
 project-switch, continuous-work, and gap-fill rules used for task choice. Long
-tasks can therefore receive multiple blocks in one day when they remain the best
-candidate, but they are not considered complete until scheduled blocks cover the
-full ``remaining_minutes``.
+tasks can therefore receive one or more work blocks in the day when they remain
+good candidates.
 
 Usage
 -----
@@ -84,8 +83,7 @@ Input Model
   timeline solver emits one concrete block at a time from scheduler-level block
   candidates. ``min_chunk_minutes`` overrides the scheduler's
   ``min_block_minutes`` for that task, and ``preferred_chunk_minutes`` adds a
-  natural task-specific duration to the candidate set. It is not required for
-  long task backlog scheduling.
+  natural task-specific duration to the candidate set.
 
 Generated Slots
 ---------------
@@ -101,8 +99,7 @@ calling the existing solvers:
 * keep ``task_dependencies`` and ``solver_config`` unchanged.
 
 Generated slots can be coarse intervals split by fixed events and ``now``.
-Split-enabled tasks may produce multiple scheduled blocks across those generated
-slots.
+Tasks may produce multiple scheduled blocks across those generated slots.
 
 Scheduling Rules
 ----------------
@@ -111,7 +108,9 @@ Current hard constraints:
 
 * fixed events and frozen past blocks cannot overlap scheduled work;
 * each emitted task block must fit in one generated interval;
-* dependency order remains based on concrete completion, not partial progress.
+* dependency order is evaluated from the blocks in the generated plan, so a
+  dependent task waits until its prerequisites have enough planned work blocks
+  ahead of it.
 
 Candidate generation rules:
 
@@ -120,8 +119,8 @@ Candidate generation rules:
 * task-level ``min_chunk_minutes`` can raise or lower the minimum block for one
   task;
 * task-level ``preferred_chunk_minutes`` adds a preferred duration candidate;
-* long tasks are not considered complete unless scheduled blocks cover their
-  full ``remaining_minutes``.
+* long tasks can contribute bounded blocks without needing to occupy every
+  available minute in the day.
 
 Soft preferences already handled by the timeline solver include:
 
