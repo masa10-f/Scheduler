@@ -879,6 +879,67 @@ class HumanDailySolverComparisonTests(unittest.TestCase):
         self.assertNotIn("dependent", scheduled_ids)
         self.assertEqual(report.violations, [])
 
+    def test_dependency_violation_checks_early_partial_dependent_block(self) -> None:
+        fixture = HumanDailyFixture(
+            date=date(2026, 5, 20),
+            time_slots=[
+                HumanTimeSlot(
+                    index=0,
+                    start=time(9, 0),
+                    end=time(9, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=1,
+                    start=time(10, 0),
+                    end=time(10, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTimeSlot(
+                    index=2,
+                    start=time(11, 0),
+                    end=time(11, 30),
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+            fixed_assignments=[
+                HumanFixedAssignment(task_id="dependent", slot_index=0, duration_minutes=30),
+                HumanFixedAssignment(task_id="prerequisite", slot_index=1, duration_minutes=30),
+            ],
+            task_dependencies={"dependent": ["prerequisite"]},
+            tasks=[
+                HumanTask(
+                    id="prerequisite",
+                    title="Prerequisite",
+                    remaining_minutes=30,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+                HumanTask(
+                    id="dependent",
+                    title="Dependent",
+                    remaining_minutes=60,
+                    priority=1,
+                    work_kind=HumanWorkKind.FOCUSED_WORK,
+                ),
+            ],
+        )
+
+        report = solve_human_daily_timeline(fixture)
+
+        self.assertEqual(
+            [(block.task_id, block.start.strftime("%H:%M")) for block in report.plan.blocks],
+            [
+                ("dependent", "09:00"),
+                ("prerequisite", "10:00"),
+                ("dependent", "11:00"),
+            ],
+        )
+        self.assertEqual(
+            [(violation.code, violation.task_id, violation.slot_index) for violation in report.violations],
+            [("dependency_order", "dependent", 0)],
+        )
+
     def test_legacy_dependency_checks_use_slot_start_time(self) -> None:
         fixture = HumanDailyFixture(
             date=date(2026, 5, 20),

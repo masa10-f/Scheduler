@@ -110,7 +110,7 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str, sequential_sta
             continue
         unscheduled[task.id] = _unscheduled_reason(task, fixture, completed, slot_usage)
 
-    _add_dependency_violations(fixture, completed, violations)
+    _add_dependency_violations(fixture, scheduled_blocks, completed, violations)
     blocks = sorted(
         scheduled_blocks,
         key=lambda block: (_minutes(block.start), block.slot_index, block.task_id),
@@ -848,26 +848,29 @@ def _deadline_score(task: HumanTask, schedule_date: date, config: HumanDailySolv
 
 def _add_dependency_violations(
     fixture: HumanDailyFixture,
-    scheduled: dict[str, HumanScheduleBlock],
+    scheduled_blocks: list[HumanScheduleBlock],
+    completed: dict[str, HumanScheduleBlock],
     violations: list[HumanConstraintViolation],
 ) -> None:
     for task_id, prerequisites in fixture.task_dependencies.items():
-        task_block = scheduled.get(task_id)
-        if task_block is None:
+        task_blocks = [block for block in scheduled_blocks if block.task_id == task_id]
+        if not task_blocks:
             continue
         for prereq in prerequisites:
-            prereq_block = scheduled.get(prereq)
+            prereq_block = completed.get(prereq)
             if prereq_block is None:
                 continue
-            if _minutes(task_block.start) < _minutes(prereq_block.end):
-                violations.append(
-                    HumanConstraintViolation(
-                        code="dependency_order",
-                        message=f"{task_id} starts before prerequisite {prereq} finishes",
-                        task_id=task_id,
-                        slot_index=task_block.slot_index,
-                    )
+            prereq_end = _minutes(prereq_block.end)
+            violations.extend(
+                HumanConstraintViolation(
+                    code="dependency_order",
+                    message=f"{task_id} starts before prerequisite {prereq} finishes",
+                    task_id=task_id,
+                    slot_index=task_block.slot_index,
                 )
+                for task_block in task_blocks
+                if _minutes(task_block.start) < prereq_end
+            )
 
 
 def _minutes(value: time) -> int:
