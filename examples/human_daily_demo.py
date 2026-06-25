@@ -4,10 +4,10 @@ import argparse
 from pathlib import Path
 
 from humancompiler_scheduler.human import (
-    compare_human_daily_solvers,
     format_human_daily_compact,
-    format_human_daily_comparison,
+    format_human_daily_report,
     load_human_daily_fixture,
+    solve_human_daily_timeline,
 )
 
 
@@ -24,9 +24,9 @@ def main() -> int:
     args = parser.parse_args()
 
     fixture = load_human_daily_fixture(args.path)
-    comparison = compare_human_daily_solvers(fixture)
-    formatter = format_human_daily_comparison if args.verbose else format_human_daily_compact
-    print(formatter(comparison), end="")
+    report = solve_human_daily_timeline(fixture)
+    output = format_human_daily_report(fixture, report) if args.verbose else format_human_daily_compact(fixture, report)
+    print(output, end="")
     return 0
 
 

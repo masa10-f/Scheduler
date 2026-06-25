@@ -14,12 +14,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", nargs="+", type=Path)
     parser.add_argument(
-        "--solver",
-        choices=["timeline_greedy", "legacy_slot"],
-        default="timeline_greedy",
-        help="solver report to include in the review output",
-    )
-    parser.add_argument(
         "--format",
         choices=["text", "markdown"],
         default="text",
@@ -42,7 +36,6 @@ def main() -> int:
         write_human_daily_review(
             args.paths,
             args.output,
-            solver_name=args.solver,
             config_override=config_override,
             output_format=args.format,
         )
@@ -51,7 +44,6 @@ def main() -> int:
     print(
         run_human_daily_review(
             args.paths,
-            solver_name=args.solver,
             config_override=config_override,
             output_format=args.format,
         ),

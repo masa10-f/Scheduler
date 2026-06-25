@@ -74,7 +74,6 @@ scheduling concepts separate from the generic solver API.
 .. code-block:: python
 
    from humancompiler_scheduler.human import (
-       compare_human_daily_solvers,
        format_human_daily_compact,
        load_human_daily_fixture,
        plan_daily_schedule,
@@ -82,6 +81,5 @@ scheduling concepts separate from the generic solver API.
 
    fixture = load_human_daily_fixture("samples/human/daily_basic.yaml")
    report = plan_daily_schedule(fixture)
-   comparison = compare_human_daily_solvers(fixture)
    print(report.plan.status)
-   print(format_human_daily_compact(comparison))
+   print(format_human_daily_compact(fixture, report))

@@ -40,7 +40,7 @@ Flexible fixtures can be loaded with the same helper used for fixed
    fixture = load_human_daily_fixture("samples/human/daily_flexible_normal.yaml")
    report = solve_human_daily_timeline(fixture)
 
-Use the review command to compare fixture output:
+Use the review command to inspect fixture output:
 
 .. code-block:: bash
 

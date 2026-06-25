@@ -135,7 +135,7 @@ Parameter Summary
 Tuning Guidelines
 -----------------
 
-Tune one parameter family at a time and compare the ``score_breakdown`` in
+Tune one parameter family at a time and inspect the ``score_breakdown`` in
 ``HumanSolverReport`` before changing another family. The scoring model is
 additive, so two small weights can outweigh one large weight when they apply to
 the same candidate.

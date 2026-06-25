@@ -6,17 +6,17 @@ from pathlib import Path
 from typing import Literal
 
 from .io import load_human_daily_fixture
-from .model import HumanDailySolverConfig, HumanSolverComparison
+from .model import HumanDailyFixture, HumanDailySolverConfig, HumanSolverReport
 from .report import format_human_daily_compact
-from .solver import compare_human_daily_solvers
+from .solver import solve_human_daily_timeline
 
 HumanDailyReviewFormat = Literal["text", "markdown"]
+HumanDailyReviewResult = tuple[HumanDailyFixture, HumanSolverReport]
 
 
 def run_human_daily_review(
     paths: Sequence[str | Path],
     *,
-    solver_name: str = "timeline_greedy",
     config_override: HumanDailySolverConfig | None = None,
     output_format: HumanDailyReviewFormat = "text",
 ) -> str:
@@ -24,11 +24,11 @@ def run_human_daily_review(
     if not paths:
         raise ValueError("at least one fixture path is required")
 
-    comparisons = [_load_comparison(path, config_override=config_override) for path in paths]
+    results = [_load_review_result(path, config_override=config_override) for path in paths]
     if output_format == "text":
-        return format_human_daily_review_text(comparisons, solver_name=solver_name)
+        return format_human_daily_review_text(results)
     if output_format == "markdown":
-        return format_human_daily_review_markdown(comparisons, solver_name=solver_name)
+        return format_human_daily_review_markdown(results)
     raise ValueError(f"unsupported review output format: {output_format}")
 
 
@@ -36,14 +36,12 @@ def write_human_daily_review(
     paths: Sequence[str | Path],
     output_path: str | Path,
     *,
-    solver_name: str = "timeline_greedy",
     config_override: HumanDailySolverConfig | None = None,
     output_format: HumanDailyReviewFormat = "text",
 ) -> str:
     """Run a review, write it to disk, and return the rendered text."""
     rendered = run_human_daily_review(
         paths,
-        solver_name=solver_name,
         config_override=config_override,
         output_format=output_format,
     )
@@ -52,44 +50,41 @@ def write_human_daily_review(
 
 
 def format_human_daily_review_text(
-    comparisons: Sequence[HumanSolverComparison],
-    *,
-    solver_name: str = "timeline_greedy",
+    results: Sequence[HumanDailyReviewResult],
 ) -> str:
+    solver_name = results[0][1].solver_name if results else "timeline_greedy"
     lines = [
         "Human daily review",
         f"solver: {solver_name}",
-        f"fixtures: {len(comparisons)}",
+        f"fixtures: {len(results)}",
         "",
     ]
-    for index, comparison in enumerate(comparisons):
+    for index, (fixture, report) in enumerate(results):
         if index > 0:
             lines.append("")
-        lines.append(format_human_daily_compact(comparison, solver_name=solver_name).rstrip())
+        lines.append(format_human_daily_compact(fixture, report).rstrip())
     return "\n".join(lines).rstrip() + "\n"
 
 
 def format_human_daily_review_markdown(
-    comparisons: Sequence[HumanSolverComparison],
-    *,
-    solver_name: str = "timeline_greedy",
+    results: Sequence[HumanDailyReviewResult],
 ) -> str:
+    solver_name = results[0][1].solver_name if results else "timeline_greedy"
     lines = [
         "# Human Daily Review",
         "",
         f"- solver: `{solver_name}`",
-        f"- fixtures: `{len(comparisons)}`",
+        f"- fixtures: `{len(results)}`",
         "",
     ]
-    for comparison in comparisons:
-        fixture = comparison.fixture
+    for fixture, report in results:
         fixture_name = fixture.metadata.get("name", "unnamed")
         lines.extend(
             [
                 f"## {fixture_name}",
                 "",
                 "```text",
-                format_human_daily_compact(comparison, solver_name=solver_name).rstrip(),
+                format_human_daily_compact(fixture, report).rstrip(),
                 "```",
                 "",
             ]
@@ -97,12 +92,12 @@ def format_human_daily_review_markdown(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _load_comparison(
+def _load_review_result(
     path: str | Path,
     *,
     config_override: HumanDailySolverConfig | None,
-) -> HumanSolverComparison:
+) -> HumanDailyReviewResult:
     fixture = load_human_daily_fixture(path)
     if config_override is not None:
         fixture = replace(fixture, solver_config=config_override)
-    return compare_human_daily_solvers(fixture)
+    return fixture, solve_human_daily_timeline(fixture)
