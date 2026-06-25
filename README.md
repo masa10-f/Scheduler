@@ -67,7 +67,7 @@ review tooling and experiments.
 
 ## Known Limitations
 
-The `0.1.0` release intentionally keeps the solver compact. It does not yet:
+The current release intentionally keeps the solver compact. It does not yet:
 
 - insert break blocks automatically;
 - preserve prior scheduled blocks or model current-task interruptibility for
@@ -110,6 +110,6 @@ Open `docs/_build/html/index.html` after the build completes.
 ## Releasing
 
 Releases are tag-driven. Update `CHANGELOG.md`, create a semantic version tag
-such as `v0.1.0`, and push it. The release workflow builds the package, checks
+such as `vX.Y.Z`, and push it. The release workflow builds the package, checks
 the distribution metadata, publishes to PyPI through Trusted Publishing, and
 creates GitHub release notes from the matching changelog section.

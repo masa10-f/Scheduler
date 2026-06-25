@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-25
+
 ### Added
 
 - Added timeline solver block-duration candidates so long `remaining_minutes`
