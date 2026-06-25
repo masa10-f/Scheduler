@@ -61,7 +61,6 @@ class HumanTuningWebUITest(unittest.TestCase):
         payload = create_tuning_payload(
             FixtureEntry(id="daily_basic", path=DAILY_BASIC, label="daily_basic.yaml"),
             fixture,
-            "timeline_greedy",
         )
 
         self.assertEqual(payload["config"]["priority_score_base"], 12)
@@ -128,7 +127,7 @@ class HumanTuningWebUITest(unittest.TestCase):
         server = SchedulerTuningHTTPServer(
             ("127.0.0.1", 0),
             TuningRequestHandler,
-            WebUIState(fixtures=registry, default_solver="timeline_greedy"),
+            WebUIState(fixtures=registry),
         )
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -138,7 +137,6 @@ class HumanTuningWebUITest(unittest.TestCase):
             body = json.dumps(
                 {
                     "fixture_id": fixture_id,
-                    "solver_name": "timeline_greedy",
                     "config": {"priority_score_base": 10},
                 }
             ).encode("utf-8")
@@ -168,7 +166,7 @@ class HumanTuningWebUITest(unittest.TestCase):
         server = SchedulerTuningHTTPServer(
             ("127.0.0.1", 0),
             TuningRequestHandler,
-            WebUIState(fixtures=registry, default_solver="legacy_slot"),
+            WebUIState(fixtures=registry),
         )
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -180,7 +178,6 @@ class HumanTuningWebUITest(unittest.TestCase):
             body = json.dumps(
                 {
                     "fixture_id": fixture_id,
-                    "solver_name": "legacy_slot",
                 }
             ).encode("utf-8")
             req = request.Request(  # noqa: S310
@@ -193,11 +190,11 @@ class HumanTuningWebUITest(unittest.TestCase):
             with request.urlopen(req, timeout=5) as response:  # noqa: S310
                 payload = json.loads(response.read().decode("utf-8"))
 
-            self.assertEqual(defaults["default_solver"], "legacy_slot")
+            self.assertIn("config", defaults)
             self.assertEqual(payload["config"]["dependency_unlock_score"], 5)
             self.assertEqual(payload["config"]["project_switch_penalty"], 6)
             self.assertEqual(payload["config"]["small_gap_fill_score"], 3)
-            self.assertEqual(payload["selected_report"]["solver_name"], "legacy_slot")
+            self.assertEqual(payload["selected_report"]["solver_name"], "timeline_greedy")
         finally:
             server.shutdown()
             server.server_close()

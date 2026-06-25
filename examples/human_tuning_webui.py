@@ -23,9 +23,9 @@ from humancompiler_scheduler.human import (
     HumanScheduleBlock,
     HumanScoreBreakdown,
     HumanSolverReport,
-    compare_human_daily_solvers,
     human_daily_solver_config_from_dict,
     load_human_daily_fixture,
+    solve_human_daily_timeline,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -121,7 +121,6 @@ class FixtureEntry:
 @dataclass(frozen=True)
 class WebUIState:
     fixtures: Mapping[str, FixtureEntry]
-    default_solver: str
 
 
 class SchedulerTuningHTTPServer(ThreadingMixIn, HTTPServer):
@@ -165,7 +164,6 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "config": solver_config_to_dict(HumanDailySolverConfig()),
-                    "default_solver": self._tuning_server().state.default_solver,
                     "schema": config_schema(),
                 }
             )
@@ -190,7 +188,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            fixture_entry, solver_name, config_override = self._read_solve_request()
+            fixture_entry, config_override = self._read_solve_request()
         except KeyError:
             self._send_error(HTTPStatus.NOT_FOUND, "unknown fixture")
             return
@@ -202,7 +200,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             fixture = load_human_daily_fixture(fixture_entry.path)
             if config_override is not None:
                 fixture = replace(fixture, solver_config=merge_solver_config(fixture.solver_config, config_override))
-            response = create_tuning_payload(fixture_entry, fixture, solver_name)
+            response = create_tuning_payload(fixture_entry, fixture)
         except (KeyError, TypeError, ValueError) as exc:
             self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
@@ -214,13 +212,12 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
     def _tuning_server(self) -> SchedulerTuningHTTPServer:
         return cast("SchedulerTuningHTTPServer", self.server)
 
-    def _read_solve_request(self) -> tuple[FixtureEntry, str, Mapping[str, Any] | None]:
+    def _read_solve_request(self) -> tuple[FixtureEntry, Mapping[str, Any] | None]:
         payload = self._read_json_body()
         fixture_id = str(payload.get("fixture_id", ""))
-        solver_name = str(payload.get("solver_name", self._tuning_server().state.default_solver))
         raw_config = payload.get("config")
         config_override = None if raw_config is None else _mapping(raw_config)
-        return self._tuning_server().state.fixtures[fixture_id], solver_name, config_override
+        return self._tuning_server().state.fixtures[fixture_id], config_override
 
     def _read_json_body(self) -> Mapping[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
@@ -277,19 +274,14 @@ def build_fixture_registry(paths: Sequence[Path], *, repo_root: Path = REPO_ROOT
 def create_tuning_payload(
     fixture_entry: FixtureEntry,
     fixture: HumanDailyFixture,
-    solver_name: str,
 ) -> dict[str, Any]:
-    comparison = compare_human_daily_solvers(fixture)
-    if solver_name not in comparison.reports:
-        raise KeyError(f"unknown solver: {solver_name}")
-    selected_report = comparison.reports[solver_name]
+    selected_report = solve_human_daily_timeline(fixture)
     return {
         "fixture": fixture_to_dict(fixture_entry, fixture),
-        "solver_name": solver_name,
+        "solver_name": selected_report.solver_name,
         "config": solver_config_to_dict(fixture.solver_config),
         "config_yaml": config_to_yaml(fixture.solver_config),
         "selected_report": report_to_dict(fixture, selected_report),
-        "reports": {name: report_to_dict(fixture, report) for name, report in comparison.reports.items()},
     }
 
 
@@ -466,7 +458,6 @@ def serve_webui(
     host: str,
     port: int,
     fixture_paths: Sequence[Path],
-    default_solver: str,
     open_browser: bool,
 ) -> None:
     registry = build_fixture_registry(fixture_paths)
@@ -476,7 +467,7 @@ def serve_webui(
     server = SchedulerTuningHTTPServer(
         (host, port),
         TuningRequestHandler,
-        WebUIState(fixtures=registry, default_solver=default_solver),
+        WebUIState(fixtures=registry),
     )
     actual_host, actual_port = cast("tuple[str, int]", server.server_address)
     url = f"http://{actual_host}:{actual_port}/"
@@ -501,12 +492,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host.")
     parser.add_argument("--port", type=int, default=8765, help="Bind port.")
-    parser.add_argument(
-        "--solver",
-        choices=["timeline_greedy", "legacy_slot"],
-        default="timeline_greedy",
-        help="Default solver selected in the UI.",
-    )
     parser.add_argument("--open", action="store_true", help="Open the WebUI in a browser.")
     return parser.parse_args()
 
@@ -518,7 +503,6 @@ def main() -> int:
         host=args.host,
         port=args.port,
         fixture_paths=fixtures,
-        default_solver=args.solver,
         open_browser=args.open,
     )
     return 0
@@ -821,13 +805,6 @@ INDEX_HTML = """<!doctype html>
           <label for="fixtureSelect">Fixture</label>
           <select id="fixtureSelect"></select>
         </div>
-        <div class="field">
-          <label for="solverSelect">Solver</label>
-          <select id="solverSelect">
-            <option value="timeline_greedy">timeline_greedy</option>
-            <option value="legacy_slot">legacy_slot</option>
-          </select>
-        </div>
         <div class="actions">
           <button class="primary" id="runButton" type="button">Run</button>
           <button id="resetButton" type="button">Reset</button>
@@ -915,7 +892,6 @@ INDEX_HTML = """<!doctype html>
       state.fixtureConfig = { ...configPayload.config };
       state.schema = configPayload.schema;
       renderFixtureSelect();
-      $("solverSelect").value = configPayload.default_solver;
       bindEvents();
       await loadFixtureBaseline();
     }
@@ -970,7 +946,6 @@ INDEX_HTML = """<!doctype html>
         runSolve();
       });
       $("fixtureSelect").addEventListener("change", loadFixtureBaseline);
-      $("solverSelect").addEventListener("change", runSolve);
       for (const button of document.querySelectorAll("[data-visibility]")) {
         button.addEventListener("click", (event) => {
           state.visibility = event.target.dataset.visibility;
@@ -1031,7 +1006,6 @@ INDEX_HTML = """<!doctype html>
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fixture_id: $("fixtureSelect").value,
-            solver_name: $("solverSelect").value,
             config: useFixtureConfig ? null : state.config,
           }),
         });

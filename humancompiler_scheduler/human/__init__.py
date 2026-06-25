@@ -20,7 +20,6 @@ from .model import (
     HumanFlexibleDailyFixture,
     HumanScheduleBlock,
     HumanScoreBreakdown,
-    HumanSolverComparison,
     HumanSolverReport,
     HumanTask,
     HumanTaskSource,
@@ -30,7 +29,6 @@ from .model import (
 )
 from .report import (
     format_human_daily_compact,
-    format_human_daily_comparison,
     format_human_daily_report,
 )
 from .review import (
@@ -39,11 +37,7 @@ from .review import (
     run_human_daily_review,
     write_human_daily_review,
 )
-from .solver import (
-    compare_human_daily_solvers,
-    solve_human_daily_legacy,
-    solve_human_daily_timeline,
-)
+from .solver import solve_human_daily_timeline
 
 __all__ = [
     "HumanAvailabilityWindow",
@@ -58,17 +52,14 @@ __all__ = [
     "HumanFlexibleDailyFixture",
     "HumanScheduleBlock",
     "HumanScoreBreakdown",
-    "HumanSolverComparison",
     "HumanSolverReport",
     "HumanTask",
     "HumanTaskSource",
     "HumanTimeSlot",
     "HumanUnscheduledTask",
     "HumanWorkKind",
-    "compare_human_daily_solvers",
     "compile_human_flexible_daily_fixture",
     "format_human_daily_compact",
-    "format_human_daily_comparison",
     "format_human_daily_report",
     "format_human_daily_review_markdown",
     "format_human_daily_review_text",
@@ -80,7 +71,6 @@ __all__ = [
     "optimize_human_daily_schedule",
     "plan_daily_schedule",
     "run_human_daily_review",
-    "solve_human_daily_legacy",
     "solve_human_daily_timeline",
     "write_human_daily_review",
 ]

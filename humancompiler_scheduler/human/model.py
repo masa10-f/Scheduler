@@ -173,7 +173,7 @@ class HumanDailyPlan:
 
 @dataclass(frozen=True)
 class HumanDailySolverConfig:
-    """Tunable scores for the Human daily comparison solvers."""
+    """Tunable scores for the Human daily timeline solver."""
 
     kind_match_score: int = 8
     kind_mismatch_score: int = 1
@@ -294,7 +294,7 @@ class HumanScoreBreakdown:
 
 @dataclass(frozen=True)
 class HumanSolverReport:
-    """Detailed result from one human daily solver."""
+    """Detailed result from the human daily solver."""
 
     solver_name: str
     plan: HumanDailyPlan
@@ -302,11 +302,3 @@ class HumanSolverReport:
     score_breakdown: list[HumanScoreBreakdown] = field(default_factory=list)
     violations: list[HumanConstraintViolation] = field(default_factory=list)
     config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
-
-
-@dataclass(frozen=True)
-class HumanSolverComparison:
-    """Collection of solver reports for the same fixture."""
-
-    fixture: HumanDailyFixture
-    reports: dict[str, HumanSolverReport]

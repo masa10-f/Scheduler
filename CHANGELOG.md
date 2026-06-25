@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added scheduler-level `min_block_minutes`, `block_granularity_minutes`, and
   `max_candidate_block_minutes` controls for block candidate generation.
 
+### Changed
+
+- Removed the legacy Human daily slot solver and comparison wrapper APIs so the
+  Human daily scheduler uses the timeline solver directly.
+
+### Fixed
+
+- Fixed Human daily dependency ordering so dependent work only starts after
+  prerequisite work has completed by time, including fixed assignments later in
+  the day.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added

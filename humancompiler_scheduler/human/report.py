@@ -7,14 +7,11 @@ from .model import (
     HumanDailyFixture,
     HumanScheduleBlock,
     HumanScoreBreakdown,
-    HumanSolverComparison,
     HumanSolverReport,
 )
 
 
-def format_human_daily_compact(comparison: HumanSolverComparison, *, solver_name: str = "timeline_greedy") -> str:
-    report = comparison.reports[solver_name]
-    fixture = comparison.fixture
+def format_human_daily_compact(fixture: HumanDailyFixture, report: HumanSolverReport) -> str:
     fixture_name = fixture.metadata.get("name", "unnamed")
     lines = [
         f"Human daily fixture: {fixture_name} ({fixture.date.isoformat()})",
@@ -31,18 +28,6 @@ def format_human_daily_compact(comparison: HumanSolverComparison, *, solver_name
     lines.extend(_format_compact_unscheduled(report))
     lines.append("")
     lines.append("Use --verbose for solver settings and full score breakdown.")
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def format_human_daily_comparison(comparison: HumanSolverComparison) -> str:
-    lines = [
-        f"Human daily fixture: {comparison.fixture.metadata.get('name', 'unnamed')}",
-        f"date: {comparison.fixture.date.isoformat()}",
-        "",
-    ]
-    for report in comparison.reports.values():
-        lines.extend(_format_report(comparison.fixture, report))
-        lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
