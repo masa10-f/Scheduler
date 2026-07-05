@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time as time_module
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -146,13 +147,15 @@ def optimize_weekly_selection(
 
     task_vars = {task.id: model.NewBoolVar(f"task_{task.id}") for task in tasks}
     recurring_vars = {task.id: model.NewBoolVar(f"weekly_{task.id}") for task in recurring_tasks}
+    scaled_task_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in tasks}
+    scaled_recurring_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in recurring_tasks}
 
     total_hours_expr = []
     for task in tasks:
-        total_hours_expr.append(task_vars[task.id] * int(task.hours * hours_scale))
+        total_hours_expr.append(task_vars[task.id] * scaled_task_hours[task.id])
     for task in recurring_tasks:
-        total_hours_expr.append(recurring_vars[task.id] * int(task.hours * hours_scale))
-    model.Add(sum(total_hours_expr) <= int(total_capacity_hours * hours_scale))
+        total_hours_expr.append(recurring_vars[task.id] * scaled_recurring_hours[task.id])
+    model.Add(sum(total_hours_expr) <= _floor_scaled_hours(total_capacity_hours, hours_scale))
 
     tasks_by_project: dict[str, list[HumanWeeklyTaskSpec]] = {}
     for task in tasks:
@@ -164,22 +167,34 @@ def optimize_weekly_selection(
         if not project_tasks:
             continue
 
-        project_terms = [task_vars[task.id] * int(task.hours * hours_scale) for task in project_tasks]
-        available_task_hours = sum(task.hours for task in project_tasks)
+        project_terms = [task_vars[task.id] * scaled_task_hours[task.id] for task in project_tasks]
+        available_task_hours = sum(scaled_task_hours[task.id] for task in project_tasks)
 
         if allocation.target_hours <= config.zero_allocation_epsilon:
             model.Add(sum(project_terms) <= 0)
             continue
 
-        ideal_min_hours = int(allocation.target_hours * config.ideal_min_factor * hours_scale)
-        ideal_max_hours = int(allocation.target_hours * config.ideal_max_factor * hours_scale)
+        ideal_min_hours = _floor_scaled_hours(
+            allocation.target_hours * config.ideal_min_factor,
+            hours_scale,
+        )
+        ideal_max_hours = _floor_scaled_hours(
+            allocation.target_hours * config.ideal_max_factor,
+            hours_scale,
+        )
 
-        if available_task_hours * hours_scale < ideal_min_hours:
-            hard_min_hours = int(available_task_hours * hours_scale)
-            max_hours = int(available_task_hours * hours_scale)
+        if available_task_hours < ideal_min_hours:
+            hard_min_hours = available_task_hours
+            max_hours = available_task_hours
         else:
             hard_min_hours = ideal_min_hours
-            max_hours = min(ideal_max_hours, int(available_task_hours * hours_scale))
+            max_hours = min(ideal_max_hours, available_task_hours)
+
+        if allocation.max_hours > 0:
+            explicit_max_hours = _floor_scaled_hours(allocation.max_hours, hours_scale)
+            max_hours = min(max_hours, explicit_max_hours)
+            if explicit_max_hours < hard_min_hours:
+                hard_min_hours = 0
 
         if max_hours > 0:
             model.Add(sum(project_terms) >= hard_min_hours)
@@ -192,9 +207,9 @@ def optimize_weekly_selection(
         base_priority = int(task.priority_score * priority_scale)
         bonus = 0
         if task.project_id:
-            allocation = allocation_by_project.get(task.project_id)
-            if allocation:
-                bonus = int(allocation.priority_weight * project_bonus_scale)
+            project_allocation = allocation_by_project.get(task.project_id)
+            if project_allocation:
+                bonus = int(project_allocation.priority_weight * project_bonus_scale)
         priority_expr.append(task_vars[task.id] * (base_priority + bonus))
 
     for task in recurring_tasks:
@@ -244,6 +259,14 @@ def optimize_weekly_selection(
         solve_time_seconds=solve_time,
         objective_value=float(solver.ObjectiveValue()),
     )
+
+
+def _ceil_scaled_hours(hours: float, scale: int) -> int:
+    return math.ceil((hours * scale) - 1e-9)
+
+
+def _floor_scaled_hours(hours: float, scale: int) -> int:
+    return math.floor((hours * scale) + 1e-9)
 
 
 def _import_cp_model() -> Any:

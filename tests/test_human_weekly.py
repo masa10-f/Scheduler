@@ -170,6 +170,56 @@ class TestHumanWeeklySelection(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertLessEqual(result.selected_hours, 40.0)
 
+    def test_fractional_hours_do_not_exceed_capacity(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id=f"task{i}",
+                    title=f"Task {i}",
+                    hours=0.25,
+                    priority_score=5.0,
+                )
+                for i in range(3)
+            ],
+            total_capacity_hours=0.6,
+        )
+
+        self.assertTrue(result.success)
+        self.assertLessEqual(result.selected_hours, 0.6)
+        self.assertLess(len(result.selected_task_ids), 3)
+
+    def test_respects_project_allocation_max_hours(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="proj_task1",
+                    title="Project Task 1",
+                    hours=4.0,
+                    priority_score=5.0,
+                    project_id="project",
+                ),
+                HumanWeeklyTaskSpec(
+                    id="proj_task2",
+                    title="Project Task 2",
+                    hours=4.0,
+                    priority_score=5.0,
+                    project_id="project",
+                ),
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=10.0,
+                    max_hours=6.0,
+                )
+            ],
+            total_capacity_hours=20.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertLessEqual(result.selected_hours_by_project.get("project", 0.0), 6.0)
+        self.assertEqual(len(result.selected_task_ids), 1)
+
     def test_public_plan_weekly_selection_accepts_mapping_and_config_override(self) -> None:
         result = plan_weekly_selection(
             {
