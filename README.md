@@ -1,9 +1,10 @@
 # HumanCompiler Scheduler
 
 HumanCompiler Scheduler is a small Python package for HumanCompiler-oriented
-daily planning experiments. It provides plain dataclass models, YAML fixture
-loading, review tools, and a timeline solver that can be called from
-HumanCompiler adapter code without depending on HumanCompiler database models.
+planning experiments. It provides plain dataclass models, YAML fixture loading,
+review tools, a daily timeline solver, and a weekly task selection solver that
+can be called from HumanCompiler adapter code without depending on
+HumanCompiler database models.
 
 The distribution name is `humancompiler-scheduler`; the import package is
 `humancompiler_scheduler`.
@@ -16,17 +17,31 @@ Install from PyPI after the first release:
 uv add humancompiler-scheduler
 ```
 
+Weekly task selection uses OR-Tools CP-SAT. Install the optional extra in
+environments that call `plan_weekly_selection`:
+
+```bash
+uv add 'humancompiler-scheduler[cp-sat]'
+```
+
 Or install the current repository checkout:
 
 ```bash
 uv pip install -e .
 ```
 
+For weekly task selection from a checkout, include the same extra:
+
+```bash
+uv pip install -e '.[cp-sat]'
+```
+
 ## HumanCompiler Integration API
 
 HumanCompiler-oriented scheduling models live under
-`humancompiler_scheduler.human`. Use `plan_daily_schedule` as the stable
-adapter-facing entry point:
+`humancompiler_scheduler.human`. Use `plan_daily_schedule` for daily scheduling
+and `plan_weekly_selection` for weekly task selection as stable adapter-facing
+entry points. The weekly entry point requires the `cp-sat` extra shown above.
 
 ```python
 from humancompiler_scheduler.human import plan_daily_schedule
@@ -60,6 +75,34 @@ report = plan_daily_schedule(
 
 for block in report.plan.blocks:
     print(block.task_id, block.start, block.end)
+```
+
+```python
+from humancompiler_scheduler.human import plan_weekly_selection
+
+result = plan_weekly_selection(
+    {
+        "tasks": [
+            {
+                "id": "proposal",
+                "title": "Draft proposal",
+                "hours": 4.0,
+                "priority_score": 9.0,
+                "project_id": "project-alpha",
+            },
+        ],
+        "project_allocations": [
+            {
+                "project_id": "project-alpha",
+                "target_hours": 4.0,
+                "priority_weight": 1.0,
+            },
+        ],
+        "total_capacity_hours": 8.0,
+    }
+)
+
+print(result.selected_task_ids)
 ```
 
 The lower-level fixture helpers and solver functions remain available for
