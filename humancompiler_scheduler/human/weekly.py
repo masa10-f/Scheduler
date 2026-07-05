@@ -136,6 +136,7 @@ def optimize_weekly_selection(
     start_time = time_module.time()
     if config is None:
         config = HumanWeeklySolverConfig()
+    _validate_unique_weekly_task_ids(tasks, recurring_tasks)
 
     cp_model = _import_cp_model()
     model = cp_model.CpModel()
@@ -157,18 +158,23 @@ def optimize_weekly_selection(
         total_hours_expr.append(recurring_vars[task.id] * scaled_recurring_hours[task.id])
     model.Add(sum(total_hours_expr) <= _floor_scaled_hours(total_capacity_hours, hours_scale))
 
-    tasks_by_project: dict[str, list[HumanWeeklyTaskSpec]] = {}
+    project_items: dict[str, list[tuple[Any, int]]] = {}
     for task in tasks:
         if task.project_id:
-            tasks_by_project.setdefault(task.project_id, []).append(task)
+            project_items.setdefault(task.project_id, []).append((task_vars[task.id], scaled_task_hours[task.id]))
+    for task in recurring_tasks:
+        if task.project_id:
+            project_items.setdefault(task.project_id, []).append(
+                (recurring_vars[task.id], scaled_recurring_hours[task.id]),
+            )
 
     for allocation in project_allocations:
-        project_tasks = tasks_by_project.get(allocation.project_id, [])
-        if not project_tasks:
+        items = project_items.get(allocation.project_id, [])
+        if not items:
             continue
 
-        project_terms = [task_vars[task.id] * scaled_task_hours[task.id] for task in project_tasks]
-        available_task_hours = sum(scaled_task_hours[task.id] for task in project_tasks)
+        project_terms = [task_var * scaled_hours for task_var, scaled_hours in items]
+        available_task_hours = sum(scaled_hours for _task_var, scaled_hours in items)
 
         if allocation.target_hours <= config.zero_allocation_epsilon:
             model.Add(sum(project_terms) <= 0)
@@ -205,15 +211,13 @@ def optimize_weekly_selection(
 
     for task in tasks:
         base_priority = int(task.priority_score * priority_scale)
-        bonus = 0
-        if task.project_id:
-            project_allocation = allocation_by_project.get(task.project_id)
-            if project_allocation:
-                bonus = int(project_allocation.priority_weight * project_bonus_scale)
+        bonus = _project_priority_bonus(task.project_id, allocation_by_project, project_bonus_scale)
         priority_expr.append(task_vars[task.id] * (base_priority + bonus))
 
     for task in recurring_tasks:
-        priority_expr.append(recurring_vars[task.id] * int(task.priority_score * priority_scale))
+        base_priority = int(task.priority_score * priority_scale)
+        bonus = _project_priority_bonus(task.project_id, allocation_by_project, project_bonus_scale)
+        priority_expr.append(recurring_vars[task.id] * (base_priority + bonus))
 
     model.Maximize(sum(priority_expr))
 
@@ -248,6 +252,10 @@ def optimize_weekly_selection(
     for task_id in selected_recurring_ids:
         task = recurring_by_id[task_id]
         selected_hours += task.hours
+        if task.project_id:
+            selected_hours_by_project[task.project_id] = (
+                selected_hours_by_project.get(task.project_id, 0.0) + task.hours
+            )
 
     return HumanWeeklySelectionResult(
         success=True,
@@ -267,6 +275,34 @@ def _ceil_scaled_hours(hours: float, scale: int) -> int:
 
 def _floor_scaled_hours(hours: float, scale: int) -> int:
     return math.floor((hours * scale) + 1e-9)
+
+
+def _validate_unique_weekly_task_ids(
+    tasks: Sequence[HumanWeeklyTaskSpec],
+    recurring_tasks: Sequence[HumanWeeklyTaskSpec],
+) -> None:
+    seen_ids: set[str] = set()
+    duplicate_ids: set[str] = set()
+    for task in [*tasks, *recurring_tasks]:
+        if task.id in seen_ids:
+            duplicate_ids.add(task.id)
+        seen_ids.add(task.id)
+    if duplicate_ids:
+        duplicate_list = ", ".join(sorted(duplicate_ids))
+        raise ValueError(f"weekly task ids must be unique across tasks and recurring_tasks: {duplicate_list}")
+
+
+def _project_priority_bonus(
+    project_id: str | None,
+    allocation_by_project: Mapping[str, HumanWeeklyProjectAllocationSpec],
+    project_bonus_scale: int,
+) -> int:
+    if project_id is None:
+        return 0
+    project_allocation = allocation_by_project.get(project_id)
+    if project_allocation is None:
+        return 0
+    return int(project_allocation.priority_weight * project_bonus_scale)
 
 
 def _import_cp_model() -> Any:

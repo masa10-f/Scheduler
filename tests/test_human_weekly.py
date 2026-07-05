@@ -220,6 +220,120 @@ class TestHumanWeeklySelection(unittest.TestCase):
         self.assertLessEqual(result.selected_hours_by_project.get("project", 0.0), 6.0)
         self.assertEqual(len(result.selected_task_ids), 1)
 
+    def test_recurring_project_hours_count_toward_allocation_max_hours(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="regular",
+                    title="Regular",
+                    hours=4.0,
+                    priority_score=1.0,
+                    project_id="project",
+                )
+            ],
+            recurring_tasks=[
+                HumanWeeklyTaskSpec(
+                    id="weekly",
+                    title="Weekly",
+                    hours=8.0,
+                    priority_score=10.0,
+                    project_id="project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=4.0,
+                    max_hours=6.0,
+                )
+            ],
+            total_capacity_hours=20.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.selected_task_ids, ["regular"])
+        self.assertEqual(result.selected_recurring_task_ids, [])
+        self.assertEqual(result.selected_hours_by_project, {"project": 4.0})
+
+    def test_zero_allocation_excludes_recurring_project_task(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="other",
+                    title="Other",
+                    hours=1.0,
+                    priority_score=1.0,
+                    project_id="other-project",
+                )
+            ],
+            recurring_tasks=[
+                HumanWeeklyTaskSpec(
+                    id="weekly",
+                    title="Weekly",
+                    hours=2.0,
+                    priority_score=10.0,
+                    project_id="blocked-project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="blocked-project",
+                    target_hours=0.0,
+                )
+            ],
+            total_capacity_hours=10.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertNotIn("weekly", result.selected_recurring_task_ids)
+
+    def test_recurring_project_hours_are_reported_by_project(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[],
+            recurring_tasks=[
+                HumanWeeklyTaskSpec(
+                    id="weekly",
+                    title="Weekly",
+                    hours=2.0,
+                    priority_score=8.0,
+                    project_id="project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=2.0,
+                )
+            ],
+            total_capacity_hours=10.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.selected_recurring_task_ids, ["weekly"])
+        self.assertEqual(result.selected_hours_by_project, {"project": 2.0})
+
+    def test_rejects_duplicate_ids_across_regular_and_recurring_tasks(self) -> None:
+        with self.assertRaisesRegex(ValueError, "weekly task ids must be unique"):
+            optimize_weekly_selection(
+                tasks=[
+                    HumanWeeklyTaskSpec(
+                        id="duplicate",
+                        title="Regular",
+                        hours=1.0,
+                        priority_score=1.0,
+                    )
+                ],
+                recurring_tasks=[
+                    HumanWeeklyTaskSpec(
+                        id="duplicate",
+                        title="Weekly",
+                        hours=1.0,
+                        priority_score=1.0,
+                    )
+                ],
+                total_capacity_hours=10.0,
+            )
+
     def test_public_plan_weekly_selection_accepts_mapping_and_config_override(self) -> None:
         result = plan_weekly_selection(
             {

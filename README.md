@@ -17,10 +17,23 @@ Install from PyPI after the first release:
 uv add humancompiler-scheduler
 ```
 
+Weekly task selection uses OR-Tools CP-SAT. Install the optional extra in
+environments that call `plan_weekly_selection`:
+
+```bash
+uv add 'humancompiler-scheduler[cp-sat]'
+```
+
 Or install the current repository checkout:
 
 ```bash
 uv pip install -e .
+```
+
+For weekly task selection from a checkout, include the same extra:
+
+```bash
+uv pip install -e '.[cp-sat]'
 ```
 
 ## HumanCompiler Integration API
@@ -28,7 +41,7 @@ uv pip install -e .
 HumanCompiler-oriented scheduling models live under
 `humancompiler_scheduler.human`. Use `plan_daily_schedule` for daily scheduling
 and `plan_weekly_selection` for weekly task selection as stable adapter-facing
-entry points:
+entry points. The weekly entry point requires the `cp-sat` extra shown above.
 
 ```python
 from humancompiler_scheduler.human import plan_daily_schedule
