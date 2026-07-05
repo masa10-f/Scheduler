@@ -1,7 +1,7 @@
 [project]
 name = "humancompiler-scheduler"
-version = "0.2.0"
-description = "HumanCompiler-oriented scheduling models, fixtures, and daily planning solvers"
+version = "0.3.0"
+description = "HumanCompiler-oriented scheduling models, fixtures, and planning solvers"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -150,6 +150,16 @@ docstring-code-format = true
   "PLR0917",
   "PLR6104",
   "SIM103",
+]
+"humancompiler_scheduler/human/weekly.py" = [
+  "ANN401",
+  "C901",
+  "PLC0415",
+  "PERF401",
+  "PLR0912",
+  "PLR0914",
+  "PLR0915",
+  "PLR6201",
 ]
 "humancompiler_scheduler/solvers.py" = [
   "ANN401", # optional OR-Tools API is imported dynamically

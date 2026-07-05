@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-05
+
+### Added
+
+- Added Human weekly task selection models and the stable
+  `plan_weekly_selection` / `optimize_weekly_selection` adapter APIs.
+- Added project allocation, zero-allocation exclusion, recurring task capacity,
+  and priority-weighted weekly selection coverage.
+
 ## [0.2.0] - 2026-06-25
 
 ### Added
