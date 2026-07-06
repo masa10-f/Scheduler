@@ -150,9 +150,7 @@ def optimize_weekly_selection(
 
     scaled_task_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in tasks}
     scaled_recurring_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in recurring_tasks}
-    task_vars = {
-        task.id: model.NewIntVar(0, scaled_task_hours[task.id], f"task_hours_{task.id}") for task in tasks
-    }
+    task_vars = {task.id: model.NewIntVar(0, scaled_task_hours[task.id], f"task_hours_{task.id}") for task in tasks}
     recurring_vars = {
         task.id: model.NewIntVar(0, scaled_recurring_hours[task.id], f"weekly_hours_{task.id}")
         for task in recurring_tasks
