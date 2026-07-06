@@ -57,6 +57,49 @@ class TestHumanWeeklySelection(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertLessEqual(result.selected_hours, 40.0)
 
+    def test_can_assign_partial_hours_for_large_task(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=10.0,
+                    priority_score=5.0,
+                )
+            ],
+            total_capacity_hours=5.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.selected_task_ids, ["large"])
+        self.assertEqual(result.assigned_task_hours, {"large": 5.0})
+        self.assertEqual(result.selected_hours, 5.0)
+
+    def test_project_allocation_can_use_partial_task_hours(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=10.0,
+                    priority_score=5.0,
+                    project_id="project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=5.0,
+                )
+            ],
+            total_capacity_hours=5.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.selected_task_ids, ["large"])
+        self.assertEqual(result.assigned_task_hours, {"large": 5.0})
+        self.assertEqual(result.selected_hours_by_project, {"project": 5.0})
+
     def test_prefers_higher_priority_task(self) -> None:
         result = optimize_weekly_selection(
             tasks=[
@@ -218,9 +261,9 @@ class TestHumanWeeklySelection(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertLessEqual(result.selected_hours_by_project.get("project", 0.0), 6.0)
-        self.assertEqual(len(result.selected_task_ids), 1)
+        self.assertEqual(result.selected_hours_by_project, {"project": 6.0})
 
-    def test_recurring_project_hours_count_toward_allocation_max_hours(self) -> None:
+    def test_recurring_project_can_be_partially_assigned_within_allocation_max_hours(self) -> None:
         result = optimize_weekly_selection(
             tasks=[
                 HumanWeeklyTaskSpec(
@@ -251,8 +294,50 @@ class TestHumanWeeklySelection(unittest.TestCase):
         )
 
         self.assertTrue(result.success)
-        self.assertEqual(result.selected_task_ids, ["regular"])
-        self.assertEqual(result.selected_recurring_task_ids, [])
+        self.assertEqual(result.selected_task_ids, [])
+        self.assertEqual(result.selected_recurring_task_ids, ["weekly"])
+        self.assertEqual(result.assigned_recurring_task_hours, {"weekly": 4.0})
+        self.assertEqual(result.selected_hours_by_project, {"project": 4.0})
+
+    def test_partial_assignment_snaps_to_half_hour_increments(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=10.0,
+                    priority_score=5.0,
+                )
+            ],
+            total_capacity_hours=4.3,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.assigned_task_hours, {"large": 4.0})
+        self.assertEqual(result.selected_hours, 4.0)
+
+    def test_project_allocation_does_not_exceed_target_hours(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=20.0,
+                    priority_score=10.0,
+                    project_id="project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=4.0,
+                )
+            ],
+            total_capacity_hours=20.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.assigned_task_hours, {"large": 4.0})
         self.assertEqual(result.selected_hours_by_project, {"project": 4.0})
 
     def test_zero_allocation_excludes_recurring_project_task(self) -> None:

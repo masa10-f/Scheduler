@@ -96,6 +96,8 @@ class HumanWeeklySelectionResult:
     status: str = "UNKNOWN"
     selected_task_ids: list[str] = field(default_factory=list)
     selected_recurring_task_ids: list[str] = field(default_factory=list)
+    assigned_task_hours: dict[str, float] = field(default_factory=dict)
+    assigned_recurring_task_hours: dict[str, float] = field(default_factory=dict)
     selected_hours: float = 0.0
     selected_hours_by_project: dict[str, float] = field(default_factory=dict)
     solve_time_seconds: float = 0.0
@@ -145,17 +147,35 @@ def optimize_weekly_selection(
     hours_scale = int(config.hours_scale)
     priority_scale = int(config.priority_scale)
     project_bonus_scale = int(config.project_bonus_scale)
+    assignment_block = _assignment_block_scaled(hours_scale)
 
-    task_vars = {task.id: model.NewBoolVar(f"task_{task.id}") for task in tasks}
-    recurring_vars = {task.id: model.NewBoolVar(f"weekly_{task.id}") for task in recurring_tasks}
     scaled_task_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in tasks}
     scaled_recurring_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in recurring_tasks}
+    task_vars = {
+        task.id: _new_assignment_var(
+            model, cp_model, scaled_task_hours[task.id], assignment_block, f"task_hours_{task.id}"
+        )
+        for task in tasks
+    }
+    recurring_vars = {
+        task.id: _new_assignment_var(
+            model, cp_model, scaled_recurring_hours[task.id], assignment_block, f"weekly_hours_{task.id}"
+        )
+        for task in recurring_tasks
+    }
+    task_selected_vars = {task.id: model.NewBoolVar(f"task_{task.id}") for task in tasks}
+    recurring_selected_vars = {task.id: model.NewBoolVar(f"weekly_{task.id}") for task in recurring_tasks}
+
+    for task in tasks:
+        _link_positive_assignment(model, task_vars[task.id], task_selected_vars[task.id])
+    for task in recurring_tasks:
+        _link_positive_assignment(model, recurring_vars[task.id], recurring_selected_vars[task.id])
 
     total_hours_expr = []
     for task in tasks:
-        total_hours_expr.append(task_vars[task.id] * scaled_task_hours[task.id])
+        total_hours_expr.append(task_vars[task.id])
     for task in recurring_tasks:
-        total_hours_expr.append(recurring_vars[task.id] * scaled_recurring_hours[task.id])
+        total_hours_expr.append(recurring_vars[task.id])
     model.Add(sum(total_hours_expr) <= _floor_scaled_hours(total_capacity_hours, hours_scale))
 
     project_items: dict[str, list[tuple[Any, int]]] = {}
@@ -173,7 +193,7 @@ def optimize_weekly_selection(
         if not items:
             continue
 
-        project_terms = [task_var * scaled_hours for task_var, scaled_hours in items]
+        project_terms = [task_var for task_var, _scaled_hours in items]
         available_task_hours = sum(scaled_hours for _task_var, scaled_hours in items)
 
         if allocation.target_hours <= config.zero_allocation_epsilon:
@@ -184,9 +204,9 @@ def optimize_weekly_selection(
             allocation.target_hours * config.ideal_min_factor,
             hours_scale,
         )
-        ideal_max_hours = _floor_scaled_hours(
-            allocation.target_hours * config.ideal_max_factor,
-            hours_scale,
+        ideal_max_hours = min(
+            _floor_scaled_hours(allocation.target_hours * config.ideal_max_factor, hours_scale),
+            _floor_scaled_hours(allocation.target_hours, hours_scale),
         )
 
         if available_task_hours < ideal_min_hours:
@@ -233,28 +253,46 @@ def optimize_weekly_selection(
             solve_time_seconds=solve_time,
         )
 
-    selected_task_ids = [task.id for task in tasks if solver.Value(task_vars[task.id]) == 1]
-    selected_recurring_ids = [task.id for task in recurring_tasks if solver.Value(recurring_vars[task.id]) == 1]
+    selected_task_ids = [task.id for task in tasks if solver.Value(task_selected_vars[task.id]) == 1]
+    selected_recurring_ids = [
+        task.id for task in recurring_tasks if solver.Value(recurring_selected_vars[task.id]) == 1
+    ]
 
     selected_hours = 0.0
     selected_hours_by_project: dict[str, float] = {}
+    assigned_task_hours: dict[str, float] = {}
+    assigned_recurring_hours: dict[str, float] = {}
     task_by_id = {task.id: task for task in tasks}
     recurring_by_id = {task.id: task for task in recurring_tasks}
 
     for task_id in selected_task_ids:
         task = task_by_id[task_id]
-        selected_hours += task.hours
+        task_hours = _scaled_assignment_to_hours(
+            solver.Value(task_vars[task_id]),
+            scaled_task_hours[task_id],
+            task.hours,
+            hours_scale,
+        )
+        assigned_task_hours[task_id] = task_hours
+        selected_hours += task_hours
         if task.project_id:
             selected_hours_by_project[task.project_id] = (
-                selected_hours_by_project.get(task.project_id, 0.0) + task.hours
+                selected_hours_by_project.get(task.project_id, 0.0) + task_hours
             )
 
     for task_id in selected_recurring_ids:
         task = recurring_by_id[task_id]
-        selected_hours += task.hours
+        task_hours = _scaled_assignment_to_hours(
+            solver.Value(recurring_vars[task_id]),
+            scaled_recurring_hours[task_id],
+            task.hours,
+            hours_scale,
+        )
+        assigned_recurring_hours[task_id] = task_hours
+        selected_hours += task_hours
         if task.project_id:
             selected_hours_by_project[task.project_id] = (
-                selected_hours_by_project.get(task.project_id, 0.0) + task.hours
+                selected_hours_by_project.get(task.project_id, 0.0) + task_hours
             )
 
     return HumanWeeklySelectionResult(
@@ -262,6 +300,8 @@ def optimize_weekly_selection(
         status="OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
         selected_task_ids=selected_task_ids,
         selected_recurring_task_ids=selected_recurring_ids,
+        assigned_task_hours=assigned_task_hours,
+        assigned_recurring_task_hours=assigned_recurring_hours,
         selected_hours=selected_hours,
         selected_hours_by_project=selected_hours_by_project,
         solve_time_seconds=solve_time,
@@ -275,6 +315,42 @@ def _ceil_scaled_hours(hours: float, scale: int) -> int:
 
 def _floor_scaled_hours(hours: float, scale: int) -> int:
     return math.floor((hours * scale) + 1e-9)
+
+
+def _assignment_block_scaled(scale: int) -> int:
+    """Smallest positive assignment increment (0.5h) expressed in scaled units."""
+    return max(1, scale // 2)
+
+
+def _new_assignment_var(model: Any, cp_model: Any, full_scaled_hours: int, block: int, name: str) -> Any:
+    values = _allowed_assignment_values(full_scaled_hours, block)
+    return model.NewIntVarFromDomain(cp_model.Domain.FromValues(values), name)
+
+
+def _allowed_assignment_values(full_scaled_hours: int, block: int) -> list[int]:
+    """Build allowed assignments: unselected (0), 0.5h increments, or the task's full hours."""
+    values = {0, full_scaled_hours}
+    increment = block
+    while increment < full_scaled_hours:
+        values.add(increment)
+        increment += block
+    return sorted(values)
+
+
+def _link_positive_assignment(model: Any, assigned_hours: Any, selected: Any) -> None:
+    model.Add(assigned_hours >= 1).OnlyEnforceIf(selected)
+    model.Add(assigned_hours == 0).OnlyEnforceIf(selected.Not())
+
+
+def _scaled_assignment_to_hours(
+    assigned_scaled_hours: int,
+    full_scaled_hours: int,
+    full_hours: float,
+    scale: int,
+) -> float:
+    if assigned_scaled_hours == full_scaled_hours:
+        return full_hours
+    return assigned_scaled_hours / scale
 
 
 def _validate_unique_weekly_task_ids(
