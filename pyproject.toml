@@ -1,6 +1,6 @@
 [project]
 name = "humancompiler-scheduler"
-version = "0.3.0"
+version = "0.3.1"
 description = "HumanCompiler-oriented scheduling models, fixtures, and planning solvers"
 readme = "README.md"
 license = "MIT"
