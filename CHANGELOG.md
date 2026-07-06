@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Extended weekly task selection to allocate partial task hours and report
-  assigned hours per regular and recurring task.
+  assigned hours per regular and recurring task. Partial assignments snap to
+  0.5-hour increments (or the task's full hours), and per-project allocations
+  are capped at `target_hours` instead of overshooting above it.
 
 ## [0.3.0] - 2026-07-05
 

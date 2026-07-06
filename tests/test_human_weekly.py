@@ -296,8 +296,49 @@ class TestHumanWeeklySelection(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.selected_task_ids, [])
         self.assertEqual(result.selected_recurring_task_ids, ["weekly"])
-        self.assertEqual(result.assigned_recurring_task_hours, {"weekly": 4.2})
-        self.assertEqual(result.selected_hours_by_project, {"project": 4.2})
+        self.assertEqual(result.assigned_recurring_task_hours, {"weekly": 4.0})
+        self.assertEqual(result.selected_hours_by_project, {"project": 4.0})
+
+    def test_partial_assignment_snaps_to_half_hour_increments(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=10.0,
+                    priority_score=5.0,
+                )
+            ],
+            total_capacity_hours=4.3,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.assigned_task_hours, {"large": 4.0})
+        self.assertEqual(result.selected_hours, 4.0)
+
+    def test_project_allocation_does_not_exceed_target_hours(self) -> None:
+        result = optimize_weekly_selection(
+            tasks=[
+                HumanWeeklyTaskSpec(
+                    id="large",
+                    title="Large",
+                    hours=20.0,
+                    priority_score=10.0,
+                    project_id="project",
+                )
+            ],
+            project_allocations=[
+                HumanWeeklyProjectAllocationSpec(
+                    project_id="project",
+                    target_hours=4.0,
+                )
+            ],
+            total_capacity_hours=20.0,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.assigned_task_hours, {"large": 4.0})
+        self.assertEqual(result.selected_hours_by_project, {"project": 4.0})
 
     def test_zero_allocation_excludes_recurring_project_task(self) -> None:
         result = optimize_weekly_selection(

@@ -147,12 +147,20 @@ def optimize_weekly_selection(
     hours_scale = int(config.hours_scale)
     priority_scale = int(config.priority_scale)
     project_bonus_scale = int(config.project_bonus_scale)
+    assignment_block = _assignment_block_scaled(hours_scale)
 
     scaled_task_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in tasks}
     scaled_recurring_hours = {task.id: _ceil_scaled_hours(task.hours, hours_scale) for task in recurring_tasks}
-    task_vars = {task.id: model.NewIntVar(0, scaled_task_hours[task.id], f"task_hours_{task.id}") for task in tasks}
+    task_vars = {
+        task.id: _new_assignment_var(
+            model, cp_model, scaled_task_hours[task.id], assignment_block, f"task_hours_{task.id}"
+        )
+        for task in tasks
+    }
     recurring_vars = {
-        task.id: model.NewIntVar(0, scaled_recurring_hours[task.id], f"weekly_hours_{task.id}")
+        task.id: _new_assignment_var(
+            model, cp_model, scaled_recurring_hours[task.id], assignment_block, f"weekly_hours_{task.id}"
+        )
         for task in recurring_tasks
     }
     task_selected_vars = {task.id: model.NewBoolVar(f"task_{task.id}") for task in tasks}
@@ -196,9 +204,9 @@ def optimize_weekly_selection(
             allocation.target_hours * config.ideal_min_factor,
             hours_scale,
         )
-        ideal_max_hours = _floor_scaled_hours(
-            allocation.target_hours * config.ideal_max_factor,
-            hours_scale,
+        ideal_max_hours = min(
+            _floor_scaled_hours(allocation.target_hours * config.ideal_max_factor, hours_scale),
+            _floor_scaled_hours(allocation.target_hours, hours_scale),
         )
 
         if available_task_hours < ideal_min_hours:
@@ -307,6 +315,26 @@ def _ceil_scaled_hours(hours: float, scale: int) -> int:
 
 def _floor_scaled_hours(hours: float, scale: int) -> int:
     return math.floor((hours * scale) + 1e-9)
+
+
+def _assignment_block_scaled(scale: int) -> int:
+    """Smallest positive assignment increment (0.5h) expressed in scaled units."""
+    return max(1, scale // 2)
+
+
+def _new_assignment_var(model: Any, cp_model: Any, full_scaled_hours: int, block: int, name: str) -> Any:
+    values = _allowed_assignment_values(full_scaled_hours, block)
+    return model.NewIntVarFromDomain(cp_model.Domain.FromValues(values), name)
+
+
+def _allowed_assignment_values(full_scaled_hours: int, block: int) -> list[int]:
+    """Build allowed assignments: unselected (0), 0.5h increments, or the task's full hours."""
+    values = {0, full_scaled_hours}
+    increment = block
+    while increment < full_scaled_hours:
+        values.add(increment)
+        increment += block
+    return sorted(values)
 
 
 def _link_positive_assignment(model: Any, assigned_hours: Any, selected: Any) -> None:
