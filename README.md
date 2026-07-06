@@ -86,7 +86,7 @@ result = plan_weekly_selection(
             {
                 "id": "proposal",
                 "title": "Draft proposal",
-                "hours": 4.0,
+                "hours": 10.0,
                 "priority_score": 9.0,
                 "project_id": "project-alpha",
             },
@@ -94,15 +94,16 @@ result = plan_weekly_selection(
         "project_allocations": [
             {
                 "project_id": "project-alpha",
-                "target_hours": 4.0,
+                "target_hours": 5.0,
                 "priority_weight": 1.0,
             },
         ],
-        "total_capacity_hours": 8.0,
+        "total_capacity_hours": 5.0,
     }
 )
 
 print(result.selected_task_ids)
+print(result.assigned_task_hours)
 ```
 
 The lower-level fixture helpers and solver functions remain available for
