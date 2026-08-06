@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: file-ignore[line-too-long]
 from __future__ import annotations
 
 import argparse
@@ -206,7 +206,7 @@ class TuningRequestHandler(BaseHTTPRequestHandler):
             return
         self._send_json(response)
 
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002, ARG002, PLR6301
+    def log_message(self, format: str, *args: object) -> None:  # ruff: ignore[builtin-argument-shadowing, unused-method-argument, no-self-use]
         return
 
     def _tuning_server(self) -> SchedulerTuningHTTPServer:

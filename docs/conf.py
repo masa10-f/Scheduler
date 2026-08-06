@@ -1,3 +1,8 @@
+"""Sphinx configuration for the HumanCompiler Scheduler documentation."""
+
+# Sphinx loads this file directly; the documentation directory is not a Python package.
+# ruff: file-ignore[implicit-namespace-package]
+
 from __future__ import annotations
 
 import sys
