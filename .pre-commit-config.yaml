@@ -10,17 +10,23 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.16
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-        files: ^(humancompiler_scheduler|tests|examples)/.*\.py$
-      - id: ruff-format
-        files: ^(humancompiler_scheduler|tests|examples)/.*\.py$
-
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --locked --group dev ruff check --force-exclude
+        language: system
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(humancompiler_scheduler|tests|examples)/.*\.py$
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --locked --group dev ruff format --force-exclude
+        language: system
+        files: ^(humancompiler_scheduler|tests|examples)/.*\.py$
+        types_or: [python, pyi, jupyter]
+        require_serial: true
       - id: mypy
         name: mypy
         entry: uv run --locked --group dev mypy

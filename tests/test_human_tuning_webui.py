@@ -140,14 +140,14 @@ class HumanTuningWebUITest(unittest.TestCase):
                     "config": {"priority_score_base": 10},
                 }
             ).encode("utf-8")
-            req = request.Request(  # noqa: S310
+            req = request.Request(  # ruff: ignore[suspicious-url-open-usage]
                 f"{base_url}/api/solve",
                 data=body,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
 
-            with request.urlopen(req, timeout=5) as response:  # noqa: S310
+            with request.urlopen(req, timeout=5) as response:  # ruff: ignore[suspicious-url-open-usage]
                 payload = json.loads(response.read().decode("utf-8"))
 
             self.assertEqual(payload["fixture"]["id"], fixture_id)
@@ -173,21 +173,21 @@ class HumanTuningWebUITest(unittest.TestCase):
         try:
             base_url = f"http://127.0.0.1:{server.server_address[1]}"
             fixture_id = next(iter(registry))
-            with request.urlopen(f"{base_url}/api/default-config", timeout=5) as response:  # noqa: S310
+            with request.urlopen(f"{base_url}/api/default-config", timeout=5) as response:  # ruff: ignore[suspicious-url-open-usage]
                 defaults = json.loads(response.read().decode("utf-8"))
             body = json.dumps(
                 {
                     "fixture_id": fixture_id,
                 }
             ).encode("utf-8")
-            req = request.Request(  # noqa: S310
+            req = request.Request(  # ruff: ignore[suspicious-url-open-usage]
                 f"{base_url}/api/solve",
                 data=body,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
 
-            with request.urlopen(req, timeout=5) as response:  # noqa: S310
+            with request.urlopen(req, timeout=5) as response:  # ruff: ignore[suspicious-url-open-usage]
                 payload = json.loads(response.read().decode("utf-8"))
 
             self.assertIn("config", defaults)

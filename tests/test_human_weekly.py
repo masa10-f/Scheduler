@@ -6,7 +6,7 @@ import pytest
 
 ortools = pytest.importorskip("ortools.sat.python.cp_model")
 
-from humancompiler_scheduler.human import (  # noqa: E402
+from humancompiler_scheduler.human import (  # ruff: ignore[module-import-not-at-top-of-file]
     HumanWeeklyProjectAllocationSpec,
     HumanWeeklySelectionFixture,
     HumanWeeklySolverConfig,

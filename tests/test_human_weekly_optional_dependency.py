@@ -13,8 +13,8 @@ def test_weekly_solver_reports_missing_optional_cp_sat_extra() -> None:
 
     def fake_import(
         name: str,
-        globals: dict[str, object] | None = None,  # noqa: A002
-        locals: dict[str, object] | None = None,  # noqa: A002
+        globals: dict[str, object] | None = None,  # ruff: ignore[builtin-argument-shadowing]
+        locals: dict[str, object] | None = None,  # ruff: ignore[builtin-argument-shadowing]
         fromlist: tuple[str, ...] = (),
         level: int = 0,
     ) -> object:
