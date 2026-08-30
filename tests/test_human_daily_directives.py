@@ -5,10 +5,12 @@ from datetime import date, time
 from humancompiler_scheduler.human import (
     HumanAvailabilityWindow,
     HumanCandidatePool,
+    HumanDailyFixture,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
     HumanFrozenTaskBlock,
     HumanTask,
+    HumanTimeSlot,
     HumanWorkKind,
     compile_human_flexible_daily_fixture,
     human_daily_fixture_from_dict,
@@ -180,6 +182,101 @@ def test_frozen_block_is_preserved_and_removed_from_availability() -> None:
     assert (frozen_result.start, frozen_result.end) == (time(10), time(11))
     assert frozen_result.directive_id == "manual"
     assert sum(block.duration_minutes for block in report.plan.blocks) == 120
+
+
+def test_frozen_block_reserves_time_in_direct_time_slots() -> None:
+    frozen = _task("frozen", minutes=60)
+    other = _task("other", minutes=120)
+    fixture = HumanDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[frozen, other],
+        time_slots=[
+            HumanTimeSlot(
+                index=0,
+                start=time(9),
+                end=time(11),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        frozen_blocks=[
+            HumanFrozenTaskBlock(
+                task_id="frozen",
+                start=time(9, 30),
+                end=time(10, 30),
+            )
+        ],
+    )
+
+    report = solve_human_daily_timeline(fixture)
+
+    for earlier, later in zip(report.plan.blocks, report.plan.blocks[1:], strict=False):
+        assert earlier.end <= later.start
+    other_blocks = [(block.start, block.end) for block in report.plan.blocks if block.task_id == "other"]
+    assert other_blocks == [(time(9), time(9, 30)), (time(10, 30), time(11))]
+    assert sum(block.duration_minutes for block in report.plan.blocks) == 120
+
+
+def test_frozen_block_deducts_from_window_capacity() -> None:
+    frozen = _task("frozen", minutes=60)
+    other = _task("other", minutes=120)
+    flexible = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[frozen, other],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(12),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+                capacity_minutes=90,
+            )
+        ],
+        frozen_blocks=[
+            HumanFrozenTaskBlock(
+                task_id="frozen",
+                start=time(9),
+                end=time(10),
+            )
+        ],
+    )
+
+    fixture = compile_human_flexible_daily_fixture(flexible)
+    report = solve_human_daily_timeline(fixture)
+
+    assert [slot.effective_capacity_minutes for slot in fixture.time_slots] == [30]
+    other_blocks = [(block.start, block.end) for block in report.plan.blocks if block.task_id == "other"]
+    assert other_blocks == [(time(10), time(10, 30))]
+    assert sum(block.duration_minutes for block in report.plan.blocks) == 90
+
+
+def test_frozen_block_exhausting_window_capacity_blocks_other_tasks() -> None:
+    frozen = _task("frozen", minutes=60)
+    other = _task("other", minutes=60)
+    flexible = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[frozen, other],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(12),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+                capacity_minutes=60,
+            )
+        ],
+        frozen_blocks=[
+            HumanFrozenTaskBlock(
+                task_id="frozen",
+                start=time(9),
+                end=time(10),
+            )
+        ],
+    )
+
+    fixture = compile_human_flexible_daily_fixture(flexible)
+    report = solve_human_daily_timeline(fixture)
+
+    assert [slot.effective_capacity_minutes for slot in fixture.time_slots] == [0]
+    assert [block.task_id for block in report.plan.blocks] == ["frozen"]
+    assert "other" in report.plan.unscheduled_task_ids
 
 
 def test_mapping_parser_accepts_directive_fields() -> None:

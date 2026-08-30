@@ -109,6 +109,7 @@ def compile_human_flexible_daily_fixture(
             ],
             fixture.date,
             fixture.now,
+            frozen_blocks=fixture.frozen_blocks,
         ),
         fixed_assignments=fixture.fixed_assignments,
         frozen_blocks=fixture.frozen_blocks,
@@ -325,6 +326,7 @@ def _generate_time_slots(
     fixed_events: Sequence[HumanFixedEvent],
     fixture_date: date,
     now: datetime | None,
+    frozen_blocks: Sequence[HumanFrozenTaskBlock] = (),
 ) -> list[HumanTimeSlot]:
     now_minutes = _now_minutes_for_date(now, fixture_date)
     raw_segments: list[tuple[int, int, int, HumanAvailabilityWindow]] = []
@@ -342,7 +344,8 @@ def _generate_time_slots(
 
     slots: list[HumanTimeSlot] = []
     remaining_capacity_by_window = {
-        window_index: window.capacity_minutes for window_index, window in enumerate(availability_windows)
+        window_index: _window_capacity_after_frozen(window, frozen_blocks)
+        for window_index, window in enumerate(availability_windows)
     }
     sorted_segments = sorted(
         raw_segments,
@@ -375,6 +378,21 @@ def _generate_time_slots(
             )
         )
     return slots
+
+
+def _window_capacity_after_frozen(
+    window: HumanAvailabilityWindow,
+    frozen_blocks: Sequence[HumanFrozenTaskBlock],
+) -> int | None:
+    if window.capacity_minutes is None:
+        return None
+    window_start = _minutes(window.start)
+    window_end = _minutes(window.end)
+    frozen_overlap = sum(
+        max(0, min(_minutes(block.end), window_end) - max(_minutes(block.start), window_start))
+        for block in frozen_blocks
+    )
+    return max(0, window.capacity_minutes - frozen_overlap)
 
 
 def _subtract_event_segments(

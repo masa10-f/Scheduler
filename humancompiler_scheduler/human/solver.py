@@ -61,6 +61,8 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
         scheduled_by_directive,
         violations,
     )
+    frozen_windows = _frozen_windows_by_slot(fixture.time_slots, scheduled_blocks)
+    _reserve_frozen_slot_capacity(fixture.time_slots, frozen_windows, slot_usage)
 
     for fixed in fixture.fixed_assignments:
         _place_fixed_assignment(
@@ -72,6 +74,7 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
             scheduled_minutes,
             slot_usage,
             slot_cursors,
+            frozen_windows,
             score_breakdown,
             unscheduled,
             violations,
@@ -84,6 +87,7 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
         scheduled_minutes,
         slot_usage,
         slot_cursors,
+        frozen_windows,
         unscheduled,
         scheduled_by_directive,
     )
@@ -114,15 +118,14 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
     if violations and status == "ok":
         status = "violations"
 
-    plan = HumanDailyPlan(
-        blocks=blocks,
-        unscheduled_task_ids=[item.task_id for item in unscheduled_tasks],
-        status=status,
-        metadata={"solver": solver_name},
-    )
     return HumanSolverReport(
         solver_name=solver_name,
-        plan=plan,
+        plan=HumanDailyPlan(
+            blocks=blocks,
+            unscheduled_task_ids=[item.task_id for item in unscheduled_tasks],
+            status=status,
+            metadata={"solver": solver_name},
+        ),
         unscheduled_tasks=unscheduled_tasks,
         score_breakdown=score_breakdown,
         violations=violations,
@@ -181,6 +184,56 @@ def _place_frozen_blocks(
             )
 
 
+def _frozen_windows_by_slot(
+    slots: list[HumanTimeSlot],
+    frozen_scheduled_blocks: list[HumanScheduleBlock],
+) -> dict[int, list[tuple[int, int]]]:
+    windows: dict[int, list[tuple[int, int]]] = {slot.index: [] for slot in slots}
+    for slot in slots:
+        slot_start = _minutes(slot.start)
+        slot_end = _minutes(slot.end)
+        for block in frozen_scheduled_blocks:
+            overlap_start = max(slot_start, _minutes(block.start))
+            overlap_end = min(slot_end, _minutes(block.end))
+            if overlap_end > overlap_start:
+                windows[slot.index].append((overlap_start, overlap_end))
+        windows[slot.index].sort()
+    return windows
+
+
+def _reserve_frozen_slot_capacity(
+    slots: list[HumanTimeSlot],
+    frozen_windows: dict[int, list[tuple[int, int]]],
+    slot_usage: dict[int, int],
+) -> None:
+    for slot in slots:
+        overlap_minutes = sum(end - start for start, end in frozen_windows[slot.index])
+        slot_usage[slot.index] += overlap_minutes
+
+
+def _advance_cursor_past_frozen(
+    slot_index: int,
+    slot_cursors: dict[int, int],
+    frozen_windows: dict[int, list[tuple[int, int]]],
+) -> None:
+    cursor = slot_cursors[slot_index]
+    for start_minutes, end_minutes in frozen_windows.get(slot_index, []):
+        if start_minutes <= cursor < end_minutes:
+            cursor = end_minutes
+    slot_cursors[slot_index] = cursor
+
+
+def _minutes_until_next_frozen(
+    slot_index: int,
+    cursor: int,
+    frozen_windows: dict[int, list[tuple[int, int]]],
+) -> int | None:
+    upcoming = [start_minutes for start_minutes, _ in frozen_windows.get(slot_index, []) if start_minutes >= cursor]
+    if not upcoming:
+        return None
+    return min(upcoming) - cursor
+
+
 def _candidate_pool_for_task(
     task: HumanTask,
     pools: list[HumanCandidatePool],
@@ -210,6 +263,7 @@ def _place_fixed_assignment(
     scheduled_minutes: dict[str, int],
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
+    frozen_windows: dict[int, list[tuple[int, int]]],
     score_breakdown: list[HumanScoreBreakdown],
     unscheduled: dict[str, str],
     violations: list[HumanConstraintViolation],
@@ -248,7 +302,11 @@ def _place_fixed_assignment(
         )
         return
 
+    _advance_cursor_past_frozen(slot.index, slot_cursors, frozen_windows)
     remaining_capacity = slot.effective_capacity_minutes - slot_usage[slot.index]
+    until_frozen = _minutes_until_next_frozen(slot.index, slot_cursors[slot.index], frozen_windows)
+    if until_frozen is not None:
+        remaining_capacity = min(remaining_capacity, until_frozen)
     duration = (
         fixed.duration_minutes
         if fixed.duration_minutes is not None
@@ -293,12 +351,14 @@ def _fill_timeline_slots(
     scheduled_minutes: dict[str, int],
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
+    frozen_windows: dict[int, list[tuple[int, int]]],
     unscheduled: dict[str, str],
     scheduled_by_directive: dict[str, int],
 ) -> None:
     tasks_by_id = {task.id: task for task in fixture.tasks}
     for slot in sorted_slots:
         while True:
+            _advance_cursor_past_frozen(slot.index, slot_cursors, frozen_windows)
             candidate_start = slot_cursors[slot.index]
             if slot.effective_capacity_minutes - slot_usage[slot.index] <= 0:
                 break
@@ -309,6 +369,7 @@ def _fill_timeline_slots(
                 scheduled_minutes,
                 slot_usage,
                 slot_cursors,
+                frozen_windows,
                 tasks_by_id,
                 unscheduled,
                 candidate_start,
@@ -367,6 +428,7 @@ def _timeline_candidates(
     scheduled_minutes: dict[str, int],
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
+    frozen_windows: dict[int, list[tuple[int, int]]],
     tasks_by_id: dict[str, HumanTask],
     unscheduled: dict[str, str],
     candidate_start: int,
@@ -394,6 +456,7 @@ def _timeline_candidates(
             scheduled_minutes,
             slot_usage,
             slot_cursors,
+            frozen_windows,
             fixture.solver_config,
             max_remaining_minutes=directive_remaining,
         )
@@ -429,10 +492,14 @@ def _timeline_chunks_for_slot(
     scheduled_minutes: dict[str, int],
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
+    frozen_windows: dict[int, list[tuple[int, int]]],
     config: HumanDailySolverConfig,
     max_remaining_minutes: int | None = None,
 ) -> list[_TimelineChunk]:
     current_available = slot.effective_capacity_minutes - slot_usage[slot.index]
+    until_frozen = _minutes_until_next_frozen(slot.index, slot_cursors[slot.index], frozen_windows)
+    if until_frozen is not None:
+        current_available = min(current_available, until_frozen)
     remaining_minutes = _remaining_task_minutes(task, scheduled_minutes.get(task.id, 0))
     if max_remaining_minutes is not None:
         remaining_minutes = min(remaining_minutes, max_remaining_minutes)
