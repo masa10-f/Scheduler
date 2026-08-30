@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-30
+
+### Added
+
+- Added document-driven daily scheduling directives via `HumanCandidatePool`:
+  filter pools restrict which tasks may fill the timeline, and required-task
+  pools with `requested_minutes` are scheduled first, with resulting blocks
+  tagged by their `directive_id`.
+- Added `HumanFrozenTaskBlock` so already-committed work survives replanning at
+  its exact time range, is removed from flexible availability, and counts
+  toward task progress and directive minutes.
+- Added `task_database` fixture references so daily fixtures can merge shared
+  task and dependency data from a separate YAML document.
+
+### Fixed
+
+- Reserved frozen block time ranges in explicitly supplied time slots so fixed
+  assignments and timeline filling cannot schedule overlapping blocks over
+  frozen work.
+- Deducted frozen block overlap from availability window `capacity_minutes`
+  during flexible fixture compilation so remaining slots cannot exceed the
+  window's productive capacity.
+
 ## [0.3.1] - 2026-07-06
 
 ### Changed
