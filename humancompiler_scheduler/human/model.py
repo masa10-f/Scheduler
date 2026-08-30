@@ -138,6 +138,51 @@ class HumanFixedAssignment:
 
 
 @dataclass(frozen=True)
+class HumanFrozenTaskBlock:
+    """Task placement with an exact time range that must survive replanning."""
+
+    task_id: str
+    start: time
+    end: time
+    directive_id: str | None = None
+    slot_index: int = 0
+    metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.end <= self.start:
+            raise ValueError("end must be later than start")
+        if self.slot_index < 0:
+            raise ValueError("slot_index must be non-negative")
+
+    @property
+    def duration_minutes(self) -> int:
+        return (self.end.hour * 60 + self.end.minute) - (self.start.hour * 60 + self.start.minute)
+
+
+@dataclass(frozen=True)
+class HumanCandidatePool:
+    """Candidate set associated with one user-authored scheduling directive.
+
+    A pool with ``required_task_id`` represents a specific-task directive. Its
+    requested minutes are preferred over ordinary filter pools. A pool without
+    ``required_task_id`` can contribute any of its eligible tasks.
+    """
+
+    id: str
+    eligible_task_ids: frozenset[str]
+    required_task_id: str | None = None
+    requested_minutes: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            raise ValueError("candidate pool id must not be empty")
+        if self.required_task_id is not None and self.required_task_id not in self.eligible_task_ids:
+            raise ValueError("required_task_id must be included in eligible_task_ids")
+        if self.requested_minutes is not None and self.requested_minutes <= 0:
+            raise ValueError("requested_minutes must be positive")
+
+
+@dataclass(frozen=True)
 class HumanScheduleBlock:
     """Scheduled task block with concrete start and end times."""
 
@@ -147,6 +192,7 @@ class HumanScheduleBlock:
     end: time
     duration_minutes: int
     is_fixed: bool = False
+    directive_id: str | None = None
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -243,6 +289,8 @@ class HumanDailyFixture:
     tasks: list[HumanTask]
     time_slots: list[HumanTimeSlot]
     fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
+    frozen_blocks: list[HumanFrozenTaskBlock] = field(default_factory=list)
+    candidate_pools: list[HumanCandidatePool] = field(default_factory=list)
     task_dependencies: dict[str, list[str]] = field(default_factory=dict)
     solver_config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
@@ -258,6 +306,8 @@ class HumanFlexibleDailyFixture:
     fixed_events: list[HumanFixedEvent] = field(default_factory=list)
     now: datetime | None = None
     fixed_assignments: list[HumanFixedAssignment] = field(default_factory=list)
+    frozen_blocks: list[HumanFrozenTaskBlock] = field(default_factory=list)
+    candidate_pools: list[HumanCandidatePool] = field(default_factory=list)
     task_dependencies: dict[str, list[str]] = field(default_factory=dict)
     solver_config: HumanDailySolverConfig = field(default_factory=HumanDailySolverConfig)
     metadata: dict[str, HumanMetadataValue] = field(default_factory=dict)
