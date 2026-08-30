@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from datetime import date, time
 
 from .model import (
+    HumanCandidatePool,
     HumanConstraintViolation,
     HumanDailyFixture,
     HumanDailyPlan,
     HumanDailySolverConfig,
     HumanFixedAssignment,
+    HumanFrozenTaskBlock,
     HumanScheduleBlock,
     HumanScoreBreakdown,
     HumanSolverReport,
@@ -30,6 +32,8 @@ class _TimelineCandidate:
     task: HumanTask
     chunk: _TimelineChunk
     score: HumanScoreBreakdown
+    directive_id: str | None = None
+    is_required: bool = False
 
 
 def solve_human_daily_timeline(fixture: HumanDailyFixture) -> HumanSolverReport:
@@ -42,11 +46,21 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
     sorted_slots = sorted(fixture.time_slots, key=lambda slot: (_minutes(slot.start), slot.index))
     scheduled_blocks: list[HumanScheduleBlock] = []
     scheduled_minutes: dict[str, int] = {}
+    scheduled_by_directive: dict[str, int] = {}
     slot_usage = {slot.index: 0 for slot in fixture.time_slots}
     slot_cursors = {slot.index: _minutes(slot.start) for slot in fixture.time_slots}
     unscheduled: dict[str, str] = {}
     score_breakdown: list[HumanScoreBreakdown] = []
     violations: list[HumanConstraintViolation] = []
+
+    _place_frozen_blocks(
+        fixture.frozen_blocks,
+        tasks_by_id,
+        scheduled_blocks,
+        scheduled_minutes,
+        scheduled_by_directive,
+        violations,
+    )
 
     for fixed in fixture.fixed_assignments:
         _place_fixed_assignment(
@@ -71,6 +85,7 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
         slot_usage,
         slot_cursors,
         unscheduled,
+        scheduled_by_directive,
     )
 
     for task in fixture.tasks:
@@ -113,6 +128,77 @@ def _solve_daily(fixture: HumanDailyFixture, *, solver_name: str) -> HumanSolver
         violations=violations,
         config=fixture.solver_config,
     )
+
+
+def _place_frozen_blocks(
+    frozen_blocks: list[HumanFrozenTaskBlock],
+    tasks_by_id: dict[str, HumanTask],
+    scheduled_blocks: list[HumanScheduleBlock],
+    scheduled_minutes: dict[str, int],
+    scheduled_by_directive: dict[str, int],
+    violations: list[HumanConstraintViolation],
+) -> None:
+    for frozen in sorted(frozen_blocks, key=lambda item: (_minutes(item.start), item.task_id)):
+        task = tasks_by_id.get(frozen.task_id)
+        if task is None:
+            violations.append(
+                HumanConstraintViolation(
+                    code="unknown_frozen_task",
+                    message=f"frozen block references unknown task {frozen.task_id}",
+                    task_id=frozen.task_id,
+                    slot_index=frozen.slot_index,
+                )
+            )
+            continue
+        if any(
+            _minutes(existing.start) < _minutes(frozen.end) and _minutes(frozen.start) < _minutes(existing.end)
+            for existing in scheduled_blocks
+        ):
+            violations.append(
+                HumanConstraintViolation(
+                    code="overlapping_frozen_blocks",
+                    message=f"frozen block for {frozen.task_id} overlaps another frozen block",
+                    task_id=frozen.task_id,
+                    slot_index=frozen.slot_index,
+                )
+            )
+            continue
+        block = HumanScheduleBlock(
+            task_id=frozen.task_id,
+            slot_index=frozen.slot_index,
+            start=frozen.start,
+            end=frozen.end,
+            duration_minutes=frozen.duration_minutes,
+            is_fixed=True,
+            directive_id=frozen.directive_id,
+            metadata=dict(frozen.metadata),
+        )
+        scheduled_blocks.append(block)
+        scheduled_minutes[task.id] = scheduled_minutes.get(task.id, 0) + frozen.duration_minutes
+        if frozen.directive_id is not None:
+            scheduled_by_directive[frozen.directive_id] = (
+                scheduled_by_directive.get(frozen.directive_id, 0) + frozen.duration_minutes
+            )
+
+
+def _candidate_pool_for_task(
+    task: HumanTask,
+    pools: list[HumanCandidatePool],
+    scheduled_by_directive: dict[str, int],
+) -> tuple[HumanCandidatePool, bool, int | None] | None:
+    required_matches = [
+        pool for pool in pools if pool.required_task_id == task.id and task.id in pool.eligible_task_ids
+    ]
+    for pool in required_matches:
+        requested_minutes = pool.requested_minutes or task.remaining_minutes
+        remaining = requested_minutes - scheduled_by_directive.get(pool.id, 0)
+        if remaining > 0:
+            return pool, True, remaining
+
+    for pool in pools:
+        if pool.required_task_id is None and task.id in pool.eligible_task_ids:
+            return pool, False, None
+    return None
 
 
 def _place_fixed_assignment(
@@ -208,6 +294,7 @@ def _fill_timeline_slots(
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
     unscheduled: dict[str, str],
+    scheduled_by_directive: dict[str, int],
 ) -> None:
     tasks_by_id = {task.id: task for task in fixture.tasks}
     for slot in sorted_slots:
@@ -225,6 +312,7 @@ def _fill_timeline_slots(
                 tasks_by_id,
                 unscheduled,
                 candidate_start,
+                scheduled_by_directive,
             )
             if not candidates:
                 break
@@ -238,6 +326,7 @@ def _fill_timeline_slots(
                 scheduled_minutes,
                 slot_usage,
                 slot_cursors,
+                scheduled_by_directive,
             )
 
     for task_id, prerequisites in fixture.task_dependencies.items():
@@ -281,6 +370,7 @@ def _timeline_candidates(
     tasks_by_id: dict[str, HumanTask],
     unscheduled: dict[str, str],
     candidate_start: int,
+    scheduled_by_directive: dict[str, int],
 ) -> list[_TimelineCandidate]:
     candidates: list[_TimelineCandidate] = []
     for task in fixture.tasks:
@@ -294,6 +384,10 @@ def _timeline_candidates(
             continue
         if not _can_use_slot(task, slot):
             continue
+        pool_match = _candidate_pool_for_task(task, fixture.candidate_pools, scheduled_by_directive)
+        if fixture.candidate_pools and pool_match is None:
+            continue
+        pool, is_required, directive_remaining = pool_match or (None, False, None)
         chunks = _timeline_chunks_for_slot(
             task,
             slot,
@@ -301,6 +395,7 @@ def _timeline_candidates(
             slot_usage,
             slot_cursors,
             fixture.solver_config,
+            max_remaining_minutes=directive_remaining,
         )
         for chunk in chunks:
             completes_task_by_end = _candidate_completes_task_by_end(task, scheduled_blocks, chunk)
@@ -321,6 +416,8 @@ def _timeline_candidates(
                     task=task,
                     chunk=chunk,
                     score=score,
+                    directive_id=pool.id if pool is not None else None,
+                    is_required=is_required,
                 )
             )
     return candidates
@@ -333,9 +430,12 @@ def _timeline_chunks_for_slot(
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
     config: HumanDailySolverConfig,
+    max_remaining_minutes: int | None = None,
 ) -> list[_TimelineChunk]:
     current_available = slot.effective_capacity_minutes - slot_usage[slot.index]
     remaining_minutes = _remaining_task_minutes(task, scheduled_minutes.get(task.id, 0))
+    if max_remaining_minutes is not None:
+        remaining_minutes = min(remaining_minutes, max_remaining_minutes)
     return [
         _TimelineChunk(
             slot=slot,
@@ -418,6 +518,7 @@ def _place_timeline_candidate(
     scheduled_minutes: dict[str, int],
     slot_usage: dict[int, int],
     slot_cursors: dict[int, int],
+    scheduled_by_directive: dict[str, int],
 ) -> HumanScheduleBlock:
     chunk = candidate.chunk
     end_minutes = chunk.start_minutes + chunk.duration_minutes
@@ -427,11 +528,16 @@ def _place_timeline_candidate(
         start=_time_from_minutes(chunk.start_minutes),
         end=_time_from_minutes(end_minutes),
         duration_minutes=chunk.duration_minutes,
+        directive_id=candidate.directive_id,
     )
     scheduled_blocks.append(block)
     scheduled_minutes[candidate.task.id] = scheduled_minutes.get(candidate.task.id, 0) + chunk.duration_minutes
     slot_usage[chunk.slot.index] += chunk.duration_minutes
     slot_cursors[chunk.slot.index] = end_minutes
+    if candidate.directive_id is not None:
+        scheduled_by_directive[candidate.directive_id] = (
+            scheduled_by_directive.get(candidate.directive_id, 0) + chunk.duration_minutes
+        )
     return block
 
 
@@ -533,10 +639,11 @@ def _task_can_schedule_block(
 
 def _timeline_candidate_key(
     candidate: _TimelineCandidate,
-) -> tuple[int, int, int, int, int, str]:
+) -> tuple[int, int, int, int, int, int, str]:
     task = candidate.task
     due_key = -1_000_000_000 if task.due_at is None else -task.due_at.toordinal()
     return (
+        1 if candidate.is_required else 0,
         candidate.score.total,
         due_key,
         -task.priority,

@@ -12,11 +12,13 @@ import yaml
 
 from .model import (
     HumanAvailabilityWindow,
+    HumanCandidatePool,
     HumanDailyFixture,
     HumanDailySolverConfig,
     HumanFixedAssignment,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
+    HumanFrozenTaskBlock,
     HumanMetadataValue,
     HumanTask,
     HumanTaskSource,
@@ -50,6 +52,8 @@ def human_daily_fixture_from_dict(data: Mapping[str, Any]) -> HumanDailyFixture:
         tasks=_parse_tasks(_required(data, "tasks")),
         time_slots=_parse_time_slots(_required(data, "time_slots")),
         fixed_assignments=_parse_fixed_assignments(data.get("fixed_assignments", [])),
+        frozen_blocks=_parse_frozen_blocks(data.get("frozen_blocks", [])),
+        candidate_pools=_parse_candidate_pools(data.get("candidate_pools", [])),
         task_dependencies=_parse_task_dependencies(data.get("task_dependencies", {})),
         solver_config=_parse_solver_config(data.get("solver_config", {})),
         metadata=_parse_metadata(data.get("metadata", {})),
@@ -67,6 +71,8 @@ def human_flexible_daily_fixture_from_dict(
         fixed_events=_parse_fixed_events(data.get("fixed_events", [])),
         now=_parse_datetime_or_none(data.get("now")),
         fixed_assignments=_parse_fixed_assignments(data.get("fixed_assignments", [])),
+        frozen_blocks=_parse_frozen_blocks(data.get("frozen_blocks", [])),
+        candidate_pools=_parse_candidate_pools(data.get("candidate_pools", [])),
         task_dependencies=_parse_task_dependencies(data.get("task_dependencies", {})),
         solver_config=_parse_solver_config(data.get("solver_config", {})),
         metadata=_parse_metadata(data.get("metadata", {})),
@@ -89,11 +95,24 @@ def compile_human_flexible_daily_fixture(
         tasks=fixture.tasks,
         time_slots=_generate_time_slots(
             fixture.availability_windows,
-            fixture.fixed_events,
+            [
+                *fixture.fixed_events,
+                *[
+                    HumanFixedEvent(
+                        title=f"Frozen task {block.task_id}",
+                        start=block.start,
+                        end=block.end,
+                        metadata={"task_id": block.task_id},
+                    )
+                    for block in fixture.frozen_blocks
+                ],
+            ],
             fixture.date,
             fixture.now,
         ),
         fixed_assignments=fixture.fixed_assignments,
+        frozen_blocks=fixture.frozen_blocks,
+        candidate_pools=fixture.candidate_pools,
         task_dependencies=fixture.task_dependencies,
         solver_config=fixture.solver_config,
         metadata=dict(fixture.metadata),
@@ -218,6 +237,48 @@ def _parse_fixed_assignments(raw: Any) -> list[HumanFixedAssignment]:
             )
         )
     return fixed_assignments
+
+
+def _parse_frozen_blocks(raw: Any) -> list[HumanFrozenTaskBlock]:
+    blocks: list[HumanFrozenTaskBlock] = []
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        return blocks
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        blocks.append(
+            HumanFrozenTaskBlock(
+                task_id=str(_required(item, "task_id")),
+                start=_parse_time(_required(item, "start")),
+                end=_parse_time(_required(item, "end")),
+                directive_id=_optional_str(item.get("directive_id")),
+                slot_index=int(item.get("slot_index", 0)),
+                metadata=_parse_metadata(item.get("metadata", {})),
+            )
+        )
+    return blocks
+
+
+def _parse_candidate_pools(raw: Any) -> list[HumanCandidatePool]:
+    pools: list[HumanCandidatePool] = []
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        return pools
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        pools.append(
+            HumanCandidatePool(
+                id=str(_required(item, "id")),
+                eligible_task_ids=frozenset(
+                    str(task_id) for task_id in _as_sequence(item.get("eligible_task_ids", []))
+                ),
+                required_task_id=_optional_str(item.get("required_task_id")),
+                requested_minutes=(
+                    int(item["requested_minutes"]) if item.get("requested_minutes") is not None else None
+                ),
+            )
+        )
+    return pools
 
 
 def _parse_task_dependencies(raw: Any) -> dict[str, list[str]]:

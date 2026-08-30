@@ -11,6 +11,7 @@ from .io import (
 )
 from .model import (
     HumanAvailabilityWindow,
+    HumanCandidatePool,
     HumanConstraintViolation,
     HumanDailyFixture,
     HumanDailyPlan,
@@ -18,6 +19,7 @@ from .model import (
     HumanFixedAssignment,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
+    HumanFrozenTaskBlock,
     HumanScheduleBlock,
     HumanScoreBreakdown,
     HumanSolverReport,
@@ -58,6 +60,7 @@ from .weekly import (
 
 __all__ = [
     "HumanAvailabilityWindow",
+    "HumanCandidatePool",
     "HumanConstraintViolation",
     "HumanDailyConfigInput",
     "HumanDailyFixture",
@@ -67,6 +70,7 @@ __all__ = [
     "HumanFixedAssignment",
     "HumanFixedEvent",
     "HumanFlexibleDailyFixture",
+    "HumanFrozenTaskBlock",
     "HumanScheduleBlock",
     "HumanScoreBreakdown",
     "HumanSolverReport",
