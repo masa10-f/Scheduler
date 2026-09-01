@@ -15,6 +15,7 @@ from .model import (
     HumanCandidatePool,
     HumanDailyFixture,
     HumanDailySolverConfig,
+    HumanDirectiveWindow,
     HumanFixedAssignment,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
@@ -277,9 +278,22 @@ def _parse_candidate_pools(raw: Any) -> list[HumanCandidatePool]:
                 requested_minutes=(
                     int(item["requested_minutes"]) if item.get("requested_minutes") is not None else None
                 ),
+                allowed_windows=tuple(
+                    HumanDirectiveWindow(
+                        start=_parse_time(_required(window, "start")),
+                        end=_parse_time(_required(window, "end")),
+                    )
+                    for window in _as_mapping_sequence(item.get("allowed_windows", []))
+                ),
             )
         )
     return pools
+
+
+def _as_mapping_sequence(raw: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        return []
+    return [item for item in raw if isinstance(item, Mapping)]
 
 
 def _parse_task_dependencies(raw: Any) -> dict[str, list[str]]:
