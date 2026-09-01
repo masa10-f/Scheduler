@@ -13,7 +13,6 @@ sys.path.insert(0, str(ROOT))
 
 project = "HumanCompiler Scheduler"
 author = "Masato Fukushima"
-release = "0.2.0"
 
 extensions = [
     "sphinx.ext.autodoc",
