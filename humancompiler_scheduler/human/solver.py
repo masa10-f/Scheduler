@@ -469,6 +469,12 @@ def _timeline_candidates(
     scheduled_by_directive: dict[str, int],
 ) -> list[_TimelineCandidate]:
     candidates: list[_TimelineCandidate] = []
+    next_directive_start = _next_directive_window_start(
+        fixture,
+        slot,
+        candidate_start,
+        scheduled_by_directive,
+    )
     for task in fixture.tasks:
         if _task_is_fully_planned(task, scheduled_minutes) or task.id in unscheduled:
             continue
@@ -494,6 +500,13 @@ def _timeline_candidates(
             None,
             None,
         )
+        candidate_max_end = directive_window_end
+        if next_directive_start is not None:
+            candidate_max_end = (
+                min(directive_window_end, next_directive_start)
+                if directive_window_end is not None
+                else next_directive_start
+            )
         chunks = _timeline_chunks_for_slot(
             task,
             slot,
@@ -503,7 +516,7 @@ def _timeline_candidates(
             frozen_windows,
             fixture.solver_config,
             max_remaining_minutes=directive_remaining,
-            max_end_minutes=directive_window_end,
+            max_end_minutes=candidate_max_end,
         )
         for chunk in chunks:
             completes_task_by_end = _candidate_completes_task_by_end(task, scheduled_blocks, chunk)
@@ -560,6 +573,10 @@ def _timeline_chunks_for_slot(
     max_end_minutes: int | None = None,
 ) -> list[_TimelineChunk]:
     current_available = slot.effective_capacity_minutes - slot_usage[slot.index]
+    current_available = min(
+        current_available,
+        _minutes(slot.end) - slot_cursors[slot.index],
+    )
     until_frozen = _minutes_until_next_frozen(slot.index, slot_cursors[slot.index], frozen_windows)
     if until_frozen is not None:
         current_available = min(current_available, until_frozen)
