@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-01
+
+### Added
+
+- Added directive-specific allowed time windows through
+  `HumanDirectiveWindow`, including mapping/YAML fixture support.
+- Applied `requested_minutes` to filter candidate pools as a total directive
+  allocation limit across all eligible tasks.
+
+### Fixed
+
+- Kept earlier unrestricted directive work schedulable when a required task is
+  constrained to a later time window.
+
 ## [0.4.0] - 2026-08-30
 
 ### Added

@@ -6,6 +6,7 @@ from humancompiler_scheduler.human import (
     HumanAvailabilityWindow,
     HumanCandidatePool,
     HumanDailyFixture,
+    HumanDirectiveWindow,
     HumanFixedEvent,
     HumanFlexibleDailyFixture,
     HumanFrozenTaskBlock,
@@ -86,6 +87,163 @@ def test_filter_pool_excludes_tasks_not_in_pool() -> None:
 
     assert [block.task_id for block in report.plan.blocks] == ["included"]
     assert report.plan.blocks[0].directive_id == "project-a"
+
+
+def test_filter_pool_requested_minutes_cap_total_across_tasks() -> None:
+    first = _task("first", priority=1, minutes=120)
+    second = _task("second", priority=2, minutes=120)
+    fixture = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[first, second],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(13),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        candidate_pools=[
+            HumanCandidatePool(
+                id="focused-pool",
+                eligible_task_ids=frozenset({first.id, second.id}),
+                requested_minutes=90,
+            )
+        ],
+    )
+
+    report = solve_human_daily_timeline(compile_human_flexible_daily_fixture(fixture))
+
+    generated = [block for block in report.plan.blocks if block.directive_id == "focused-pool"]
+    assert sum(block.duration_minutes for block in generated) == 90
+
+
+def test_directive_window_limits_filter_pool_placement() -> None:
+    task = _task("afternoon", minutes=180)
+    fixture = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[task],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(18),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        candidate_pools=[
+            HumanCandidatePool(
+                id="afternoon-pool",
+                eligible_task_ids=frozenset({task.id}),
+                requested_minutes=120,
+                allowed_windows=(HumanDirectiveWindow(start=time(13), end=time(15)),),
+            )
+        ],
+    )
+
+    report = solve_human_daily_timeline(compile_human_flexible_daily_fixture(fixture))
+
+    assert [(block.start, block.end) for block in report.plan.blocks] == [(time(13), time(15))]
+
+
+def test_directive_windows_do_not_skip_earlier_unrestricted_pool() -> None:
+    morning = _task("morning", priority=3, minutes=60)
+    required_afternoon = _task("required-afternoon", priority=1, minutes=60)
+    fixture = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[morning, required_afternoon],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(15),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        candidate_pools=[
+            HumanCandidatePool(
+                id="afternoon-required",
+                eligible_task_ids=frozenset({required_afternoon.id}),
+                required_task_id=required_afternoon.id,
+                allowed_windows=(HumanDirectiveWindow(start=time(13), end=time(14)),),
+            ),
+            HumanCandidatePool(
+                id="morning-pool",
+                eligible_task_ids=frozenset({morning.id}),
+                allowed_windows=(HumanDirectiveWindow(start=time(9), end=time(10)),),
+            ),
+        ],
+    )
+
+    report = solve_human_daily_timeline(compile_human_flexible_daily_fixture(fixture))
+
+    assert [(block.task_id, block.start, block.end) for block in report.plan.blocks] == [
+        ("morning", time(9), time(10)),
+        ("required-afternoon", time(13), time(14)),
+    ]
+
+
+def test_earlier_work_stops_at_upcoming_required_window() -> None:
+    ordinary = _task("ordinary", priority=1, minutes=180)
+    required = _task("required", priority=5, minutes=60)
+    fixture = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[ordinary, required],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(15),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        fixed_events=[HumanFixedEvent(title="meeting", start=time(9), end=time(11))],
+        candidate_pools=[
+            HumanCandidatePool(
+                id="ordinary-pool",
+                eligible_task_ids=frozenset({ordinary.id}),
+            ),
+            HumanCandidatePool(
+                id="required-window",
+                eligible_task_ids=frozenset({required.id}),
+                required_task_id=required.id,
+                requested_minutes=60,
+                allowed_windows=(HumanDirectiveWindow(start=time(13), end=time(14)),),
+            ),
+        ],
+    )
+
+    report = solve_human_daily_timeline(compile_human_flexible_daily_fixture(fixture))
+
+    assert any(
+        block.task_id == required.id and block.start == time(13) and block.end == time(14)
+        for block in report.plan.blocks
+    )
+    assert all(
+        block.end <= time(13) or block.start >= time(14) for block in report.plan.blocks if block.task_id == ordinary.id
+    )
+
+
+def test_directive_window_jump_never_exceeds_availability_slot() -> None:
+    task = _task("late-window", minutes=180)
+    fixture = HumanFlexibleDailyFixture(
+        date=date(2030, 1, 2),
+        tasks=[task],
+        availability_windows=[
+            HumanAvailabilityWindow(
+                start=time(9),
+                end=time(15),
+                work_kind=HumanWorkKind.FOCUSED_WORK,
+            )
+        ],
+        candidate_pools=[
+            HumanCandidatePool(
+                id="late-window",
+                eligible_task_ids=frozenset({task.id}),
+                allowed_windows=(HumanDirectiveWindow(start=time(13), end=time(18)),),
+            )
+        ],
+    )
+
+    report = solve_human_daily_timeline(compile_human_flexible_daily_fixture(fixture))
+
+    assert [(block.start, block.end) for block in report.plan.blocks] == [(time(13), time(15))]
 
 
 def test_specific_directive_splits_around_fixed_event() -> None:
@@ -306,6 +464,7 @@ def test_mapping_parser_accepts_directive_fields() -> None:
                     "eligible_task_ids": ["task"],
                     "required_task_id": "task",
                     "requested_minutes": 60,
+                    "allowed_windows": [{"start": "10:00", "end": "11:00"}],
                 }
             ],
         }
@@ -313,3 +472,4 @@ def test_mapping_parser_accepts_directive_fields() -> None:
 
     assert fixture.frozen_blocks[0].directive_id == "frozen"
     assert fixture.candidate_pools[0].required_task_id == "task"
+    assert fixture.candidate_pools[0].allowed_windows == (HumanDirectiveWindow(start=time(10), end=time(11)),)

@@ -160,18 +160,33 @@ class HumanFrozenTaskBlock:
 
 
 @dataclass(frozen=True)
+class HumanDirectiveWindow:
+    """Same-day time range in which one scheduling directive may place work."""
+
+    start: time
+    end: time
+
+    def __post_init__(self) -> None:
+        if self.end <= self.start:
+            raise ValueError("end must be later than start")
+
+
+@dataclass(frozen=True)
 class HumanCandidatePool:
     """Candidate set associated with one user-authored scheduling directive.
 
     A pool with ``required_task_id`` represents a specific-task directive. Its
     requested minutes are preferred over ordinary filter pools. A pool without
-    ``required_task_id`` can contribute any of its eligible tasks.
+    ``required_task_id`` can contribute any of its eligible tasks. For both
+    forms, ``requested_minutes`` limits the total minutes attributed to this
+    directive and ``allowed_windows`` limits their placement time.
     """
 
     id: str
     eligible_task_ids: frozenset[str]
     required_task_id: str | None = None
     requested_minutes: int | None = None
+    allowed_windows: tuple[HumanDirectiveWindow, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.id:

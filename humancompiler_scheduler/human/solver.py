@@ -238,20 +238,45 @@ def _candidate_pool_for_task(
     task: HumanTask,
     pools: list[HumanCandidatePool],
     scheduled_by_directive: dict[str, int],
-) -> tuple[HumanCandidatePool, bool, int | None] | None:
+    candidate_start: int,
+) -> tuple[HumanCandidatePool, bool, int | None, int | None] | None:
     required_matches = [
         pool for pool in pools if pool.required_task_id == task.id and task.id in pool.eligible_task_ids
     ]
     for pool in required_matches:
-        requested_minutes = pool.requested_minutes or task.remaining_minutes
-        remaining = requested_minutes - scheduled_by_directive.get(pool.id, 0)
-        if remaining > 0:
-            return pool, True, remaining
+        remaining = _directive_remaining_minutes(pool, scheduled_by_directive)
+        window_end = _directive_window_end(pool, candidate_start)
+        if remaining != 0 and window_end is not None:
+            return pool, True, remaining, window_end
 
     for pool in pools:
-        if pool.required_task_id is None and task.id in pool.eligible_task_ids:
-            return pool, False, None
+        if pool.required_task_id is not None or task.id not in pool.eligible_task_ids:
+            continue
+        remaining = _directive_remaining_minutes(pool, scheduled_by_directive)
+        window_end = _directive_window_end(pool, candidate_start)
+        if remaining != 0 and window_end is not None:
+            return pool, False, remaining, window_end
     return None
+
+
+def _directive_remaining_minutes(
+    pool: HumanCandidatePool,
+    scheduled_by_directive: dict[str, int],
+) -> int | None:
+    if pool.requested_minutes is None:
+        return None
+    return max(0, pool.requested_minutes - scheduled_by_directive.get(pool.id, 0))
+
+
+def _directive_window_end(pool: HumanCandidatePool, candidate_start: int) -> int | None:
+    if not pool.allowed_windows:
+        return 24 * 60
+    matching_ends = [
+        _minutes(window.end)
+        for window in pool.allowed_windows
+        if _minutes(window.start) <= candidate_start < _minutes(window.end)
+    ]
+    return max(matching_ends) if matching_ends else None
 
 
 def _place_fixed_assignment(
@@ -376,7 +401,16 @@ def _fill_timeline_slots(
                 scheduled_by_directive,
             )
             if not candidates:
-                break
+                next_start = _next_directive_window_start(
+                    fixture,
+                    slot,
+                    candidate_start,
+                    scheduled_by_directive,
+                )
+                if next_start is None:
+                    break
+                slot_cursors[slot.index] = next_start
+                continue
             candidate = max(
                 candidates,
                 key=_timeline_candidate_key,
@@ -435,6 +469,12 @@ def _timeline_candidates(
     scheduled_by_directive: dict[str, int],
 ) -> list[_TimelineCandidate]:
     candidates: list[_TimelineCandidate] = []
+    next_directive_start = _next_directive_window_start(
+        fixture,
+        slot,
+        candidate_start,
+        scheduled_by_directive,
+    )
     for task in fixture.tasks:
         if _task_is_fully_planned(task, scheduled_minutes) or task.id in unscheduled:
             continue
@@ -446,10 +486,27 @@ def _timeline_candidates(
             continue
         if not _can_use_slot(task, slot):
             continue
-        pool_match = _candidate_pool_for_task(task, fixture.candidate_pools, scheduled_by_directive)
+        pool_match = _candidate_pool_for_task(
+            task,
+            fixture.candidate_pools,
+            scheduled_by_directive,
+            candidate_start,
+        )
         if fixture.candidate_pools and pool_match is None:
             continue
-        pool, is_required, directive_remaining = pool_match or (None, False, None)
+        pool, is_required, directive_remaining, directive_window_end = pool_match or (
+            None,
+            False,
+            None,
+            None,
+        )
+        candidate_max_end = directive_window_end
+        if next_directive_start is not None:
+            candidate_max_end = (
+                min(directive_window_end, next_directive_start)
+                if directive_window_end is not None
+                else next_directive_start
+            )
         chunks = _timeline_chunks_for_slot(
             task,
             slot,
@@ -459,6 +516,7 @@ def _timeline_candidates(
             frozen_windows,
             fixture.solver_config,
             max_remaining_minutes=directive_remaining,
+            max_end_minutes=candidate_max_end,
         )
         for chunk in chunks:
             completes_task_by_end = _candidate_completes_task_by_end(task, scheduled_blocks, chunk)
@@ -486,6 +544,23 @@ def _timeline_candidates(
     return candidates
 
 
+def _next_directive_window_start(
+    fixture: HumanDailyFixture,
+    slot: HumanTimeSlot,
+    candidate_start: int,
+    scheduled_by_directive: dict[str, int],
+) -> int | None:
+    slot_end = _minutes(slot.end)
+    starts = [
+        _minutes(window.start)
+        for pool in fixture.candidate_pools
+        if pool.eligible_task_ids and _directive_remaining_minutes(pool, scheduled_by_directive) != 0
+        for window in pool.allowed_windows
+        if candidate_start < _minutes(window.start) < slot_end and _minutes(window.end) > _minutes(slot.start)
+    ]
+    return min(starts) if starts else None
+
+
 def _timeline_chunks_for_slot(
     task: HumanTask,
     slot: HumanTimeSlot,
@@ -495,11 +570,21 @@ def _timeline_chunks_for_slot(
     frozen_windows: dict[int, list[tuple[int, int]]],
     config: HumanDailySolverConfig,
     max_remaining_minutes: int | None = None,
+    max_end_minutes: int | None = None,
 ) -> list[_TimelineChunk]:
     current_available = slot.effective_capacity_minutes - slot_usage[slot.index]
+    current_available = min(
+        current_available,
+        _minutes(slot.end) - slot_cursors[slot.index],
+    )
     until_frozen = _minutes_until_next_frozen(slot.index, slot_cursors[slot.index], frozen_windows)
     if until_frozen is not None:
         current_available = min(current_available, until_frozen)
+    if max_end_minutes is not None:
+        current_available = min(
+            current_available,
+            max_end_minutes - slot_cursors[slot.index],
+        )
     remaining_minutes = _remaining_task_minutes(task, scheduled_minutes.get(task.id, 0))
     if max_remaining_minutes is not None:
         remaining_minutes = min(remaining_minutes, max_remaining_minutes)
